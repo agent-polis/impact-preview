@@ -11,7 +11,10 @@
     {
       "registryType": "pypi",
       "identifier": "impact-preview",
-      "version": "0.2.1"
+      "version": "0.2.1",
+      "transport": {
+        "type": "stdio"
+      }
     }
   ]
 }
