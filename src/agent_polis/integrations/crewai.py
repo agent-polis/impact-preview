@@ -304,7 +304,7 @@ def create_crewai_tool(api_url: str, api_key: str) -> "AgentPolisTool":
     """
     if not CREWAI_AVAILABLE:
         raise ImportError(
-            "CrewAI is not installed. Install it with: pip install agent-polis[crewai]"
+            "CrewAI is not installed. Install it with: pip install impact-preview[crewai]"
         )
     
     return AgentPolisTool(api_url=api_url, api_key=api_key)

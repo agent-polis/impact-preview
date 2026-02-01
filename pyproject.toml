@@ -1,5 +1,5 @@
 [project]
-name = "agent-polis"
+name = "impact-preview"
 version = "0.2.0"
 description = "Impact preview for AI agents - see exactly what will change before any autonomous AI action executes"
 readme = "README.md"
@@ -63,8 +63,8 @@ Documentation = "https://github.com/agent-polis/Leviathan#readme"
 Repository = "https://github.com/agent-polis/Leviathan"
 
 [project.scripts]
-agent-polis = "agent_polis.main:cli"
-agent-polis-mcp = "agent_polis.mcp_server:main"
+impact-preview = "agent_polis.main:cli"
+impact-preview-mcp = "agent_polis.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

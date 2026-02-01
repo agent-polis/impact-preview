@@ -15,7 +15,7 @@ Usage:
     # Then in Claude Desktop config (~/.config/claude/claude_desktop_config.json):
     {
         "mcpServers": {
-            "agent-polis": {
+            "impact-preview": {
                 "url": "http://localhost:8000/mcp"
             }
         }
@@ -464,7 +464,7 @@ def main():
     print("""
 {
     "mcpServers": {
-        "agent-polis": {
+        "impact-preview": {
             "url": "http://localhost:8000/mcp"
         }
     }

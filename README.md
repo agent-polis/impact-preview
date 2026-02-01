@@ -48,8 +48,8 @@ The fastest way to try Agent Polis is the **MCP server** with Claude Desktop or 
 ### 1. Install & Run
 
 ```bash
-pip install agent-polis
-agent-polis-mcp
+pip install impact-preview
+impact-preview-mcp
 ```
 
 ### 2. Configure Claude Desktop
@@ -59,7 +59,7 @@ Add to your config (`~/Library/Application Support/Claude/claude_desktop_config.
 ```json
 {
     "mcpServers": {
-        "agent-polis": {
+        "impact-preview": {
             "url": "http://localhost:8000/mcp"
         }
     }
@@ -93,8 +93,8 @@ For the complete approval workflow with dashboard and API:
 docker-compose up -d
 
 # Or locally
-pip install agent-polis
-agent-polis
+pip install impact-preview
+impact-preview
 ```
 
 ### Register an Agent
@@ -147,7 +147,7 @@ write_config("/etc/myapp/config.yaml", "new content")
 Launch the Streamlit dashboard to review pending actions:
 
 ```bash
-pip install agent-polis[ui]
+pip install impact-preview[ui]
 streamlit run src/agent_polis/ui/app.py
 ```
 

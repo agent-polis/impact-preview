@@ -6,7 +6,7 @@ This script demonstrates how to use Agent Polis simulations
 as a tool in CrewAI agents for decision validation.
 
 Prerequisites:
-    pip install agent-polis[crewai]
+    pip install impact-preview[crewai]
     # Or: pip install crewai httpx
 
 Usage:
