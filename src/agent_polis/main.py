@@ -130,7 +130,7 @@ async def agent_card() -> dict:
             "agents": "/api/v1/agents",
         },
         "contact": {
-            "url": "https://github.com/agent-polis/Leviathan",
+            "url": "https://github.com/agent-polis/impact-preview",
         },
     }
 

@@ -1,10 +1,10 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.agent-polis/impact-preview",
-  "description": "Impact preview for AI agents - see exactly what will change before any autonomous agent action executes. Like 'terraform plan' for AI agents.",
+  "description": "Impact preview for AI agents - see what changes before any action executes.",
   "version": "0.2.1",
   "repository": {
-    "url": "https://github.com/agent-polis/Leviathan",
+    "url": "https://github.com/agent-polis/impact-preview",
     "source": "github"
   },
   "packages": [

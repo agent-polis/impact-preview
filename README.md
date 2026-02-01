@@ -214,8 +214,8 @@ LOG_LEVEL=INFO
 ## 🤝 Contributing
 
 ```bash
-git clone https://github.com/agent-polis/Leviathan.git
-cd Leviathan
+git clone https://github.com/agent-polis/impact-preview.git
+cd impact-preview
 pip install -e .[dev]
 pre-commit install
 pytest
