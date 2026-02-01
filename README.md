@@ -165,6 +165,53 @@ client.wait_for_approval(action["id"], timeout=300)
 client.execute(action["id"])
 ```
 
+## 🔌 MCP Server (Claude Desktop, Cursor)
+
+Agent Polis includes an MCP server for direct integration with Claude Desktop, Cursor, and other MCP-compatible clients. **This is the fastest way to try it**.
+
+### 1. Start the MCP Server
+
+```bash
+# Install and run
+pip install agent-polis
+agent-polis-mcp
+
+# Or with uvicorn
+uvicorn agent_polis.mcp_server:mcp.app --host 0.0.0.0 --port 8000
+```
+
+### 2. Configure Claude Desktop
+
+Add to `~/.config/claude/claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+    "mcpServers": {
+        "agent-polis": {
+            "url": "http://localhost:8000/mcp"
+        }
+    }
+}
+```
+
+### 3. Use It
+
+Now when you ask Claude to edit files, it has access to these tools:
+
+| Tool | Description |
+|------|-------------|
+| `preview_file_write` | See diff before any file edit |
+| `preview_file_create` | Preview new file creation |
+| `preview_file_delete` | Preview deletions (shows what will be lost) |
+| `preview_shell_command` | Analyze shell commands for dangerous patterns |
+| `preview_database_query` | Check SQL queries before execution |
+| `check_path_risk` | Quick risk check for any file path |
+
+**Example prompt:**
+> "Preview what would happen if you changed the database URL in config.yaml to point to production"
+
+Claude will now use `preview_file_write` to show you the diff and risk assessment *before* making any changes.
+
 ## 🖥️ Dashboard
 
 Launch the Streamlit dashboard to review pending actions:
