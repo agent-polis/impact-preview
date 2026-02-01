@@ -16,6 +16,11 @@ from agent_polis.main import app
 from agent_polis.shared.db import Base, get_db
 from agent_polis.config import settings
 
+# Import all models to ensure they're registered with Base
+from agent_polis.agents.db_models import Agent
+from agent_polis.events.models import Event
+from agent_polis.actions.db_models import Action
+
 
 # Use in-memory SQLite for tests (or test PostgreSQL if available)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -72,7 +77,11 @@ async def client(test_session: AsyncSession) -> AsyncGenerator[AsyncClient, None
     app.dependency_overrides[get_db] = override_get_db
     
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(
+        transport=transport, 
+        base_url="http://test",
+        follow_redirects=True,  # Handle FastAPI trailing slash redirects
+    ) as client:
         yield client
     
     app.dependency_overrides.clear()
@@ -111,3 +120,10 @@ async def registered_agent(client: AsyncClient) -> dict:
 async def auth_headers(registered_agent: dict) -> dict:
     """Get authentication headers for a registered agent."""
     return {"X-API-Key": registered_agent["api_key"]}
+
+
+# Alias for backward compatibility and clarity
+@pytest_asyncio.fixture
+async def async_client(client: AsyncClient) -> AsyncClient:
+    """Alias for client fixture."""
+    return client

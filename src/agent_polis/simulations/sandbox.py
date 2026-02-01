@@ -6,7 +6,7 @@ We use it to execute simulation scenarios safely.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -52,7 +52,7 @@ class SandboxExecutor:
             SimulationResult with output, logs, and status
         """
         logs: list[ExecutionLog] = []
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         # Log start
         logs.append(ExecutionLog(
@@ -72,7 +72,7 @@ class SandboxExecutor:
             
             # Create sandbox
             logs.append(ExecutionLog(
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 level="info",
                 message="Creating E2B sandbox",
             ))
@@ -94,7 +94,7 @@ class SandboxExecutor:
                 
                 # Execute
                 logs.append(ExecutionLog(
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     level="info",
                     message="Executing simulation code",
                 ))
@@ -104,7 +104,7 @@ class SandboxExecutor:
                     timeout=timeout_seconds,
                 )
                 
-                end_time = datetime.utcnow()
+                end_time = datetime.now(timezone.utc)
                 duration_ms = int((end_time - start_time).total_seconds() * 1000)
                 
                 # Parse result
@@ -139,7 +139,7 @@ class SandboxExecutor:
             logger.error("Sandbox execution failed", error=str(e), exc_info=e)
             
             logs.append(ExecutionLog(
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 level="error",
                 message=f"Execution error: {str(e)}",
             ))
@@ -209,13 +209,13 @@ class SandboxExecutor:
         NOT suitable for production - use E2B for real isolation.
         """
         logs.append(ExecutionLog(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             level="warning",
             message="Using mock execution (E2B not configured)",
             source="system",
         ))
         
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         try:
             # Create a restricted globals dict
@@ -276,7 +276,7 @@ class SandboxExecutor:
                 sys.stdout = old_stdout
                 sys.stderr = old_stderr
             
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
             
             stdout_str = stdout_capture.getvalue()
@@ -304,7 +304,7 @@ class SandboxExecutor:
             
         except Exception as e:
             logs.append(ExecutionLog(
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 level="error",
                 message=f"Mock execution error: {str(e)}",
             ))

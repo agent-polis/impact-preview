@@ -2,7 +2,7 @@
 SQLAlchemy database models for agents.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -82,7 +82,7 @@ class Agent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
     )
     
     last_active_at: Mapped[datetime | None] = mapped_column(
@@ -99,7 +99,7 @@ class Agent(Base):
     month_reset_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
     )
     
     # Relationships
@@ -114,12 +114,12 @@ class Agent(Base):
     
     def update_last_active(self) -> None:
         """Update last active timestamp."""
-        self.last_active_at = datetime.utcnow()
+        self.last_active_at = datetime.now(timezone.utc)
     
     def increment_simulation_count(self) -> None:
         """Increment the monthly simulation counter."""
         # Reset if new month
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if self.month_reset_at.month != now.month or self.month_reset_at.year != now.year:
             self.simulations_this_month = 0
             self.month_reset_at = now
@@ -128,7 +128,7 @@ class Agent(Base):
     def can_run_simulation(self, monthly_limit: int) -> bool:
         """Check if agent can run another simulation this month."""
         # Reset if new month
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if self.month_reset_at.month != now.month or self.month_reset_at.year != now.year:
             return True
         return self.simulations_this_month < monthly_limit

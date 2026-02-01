@@ -135,7 +135,7 @@ async def rebuild_projections(session: AsyncSession, stream_id: str) -> None:
             {
                 "stream_id": event.stream_id,
                 "data": event.event_data,
-                "metadata": event.metadata,
+                "metadata": event.event_metadata,
             }
         )
         await publish_event(domain_event)

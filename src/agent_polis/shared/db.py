@@ -2,16 +2,35 @@
 Database connection and session management using SQLAlchemy async.
 """
 
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.types import TypeDecorator
 
 from agent_polis.config import settings
+
+
+class JSONType(TypeDecorator):
+    """
+    Cross-database JSON type that uses JSONB on PostgreSQL and JSON on SQLite.
+    
+    This allows tests to run on SQLite while production uses PostgreSQL's
+    more efficient JSONB type.
+    """
+    impl = JSON
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect: Any) -> Any:
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(JSONB())
+        return dialect.type_descriptor(JSON())
 
 # Create async engine
 engine = create_async_engine(

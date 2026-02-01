@@ -61,12 +61,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             limit_key = f"ratelimit:ip:{client_ip}"
             max_requests = settings.rate_limit_requests
         
-        # Check rate limit
-        is_allowed, remaining, reset_in = await limiter.is_allowed(
-            key=limit_key,
-            max_requests=max_requests,
-            window_seconds=settings.rate_limit_window,
-        )
+        # Check rate limit - gracefully degrade if Redis fails
+        try:
+            is_allowed, remaining, reset_in = await limiter.is_allowed(
+                key=limit_key,
+                max_requests=max_requests,
+                window_seconds=settings.rate_limit_window,
+            )
+        except Exception as e:
+            logger.warning("Rate limiting disabled - Redis connection failed", error=str(e))
+            return await call_next(request)
         
         if not is_allowed:
             logger.warning(

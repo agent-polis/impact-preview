@@ -1,5 +1,8 @@
 """
-Agent Polis - FastAPI Application Entry Point.
+Agent Polis - Impact Preview for AI Agents
+
+"Terraform plan" for AI agent actions. See exactly what will change
+before any autonomous agent action executes.
 
 This module creates and configures the FastAPI application with all routers,
 middleware, and event handlers.
@@ -28,7 +31,7 @@ logger = structlog.get_logger()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler for startup and shutdown events."""
     # Startup
-    logger.info("Starting Agent Polis", version="0.1.0", env=settings.app_env)
+    logger.info("Starting Agent Polis", version="0.2.0", env=settings.app_env)
     await init_db()
     logger.info("Database initialized")
     
@@ -44,8 +47,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 # Create FastAPI application
 app = FastAPI(
     title="Agent Polis",
-    description="Governance and coordination layer for AI agents with simulation-integrated decision-making",
-    version="0.1.0",
+    description=(
+        "Impact preview for AI agents - see exactly what will change before "
+        "any autonomous agent action executes. Like 'terraform plan' for AI agents."
+    ),
+    version="0.2.0",
     docs_url="/docs" if settings.is_development else None,
     redoc_url="/redoc" if settings.is_development else None,
     lifespan=lifespan,
@@ -90,7 +96,7 @@ async def health_check() -> dict:
     """Health check endpoint for container orchestration."""
     return {
         "status": "healthy",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "environment": settings.app_env,
     }
 
@@ -102,21 +108,25 @@ async def agent_card() -> dict:
     A2A Agent Card - describes this agent's capabilities.
     
     This endpoint is required for A2A protocol discovery.
-    Other agents use this to understand what this polis can do.
+    Other agents use this to understand what Agent Polis can do.
     """
     return {
         "name": "Agent Polis",
-        "description": "Governance and coordination layer for AI agents with simulation-integrated decision-making",
-        "version": "0.1.0",
+        "description": (
+            "Impact preview for AI agents. Submit proposed actions, "
+            "see exactly what will change, get human approval before execution."
+        ),
+        "version": "0.2.0",
         "protocol": "a2a/1.0",
         "capabilities": [
-            "simulation",
-            "governance",
-            "coordination",
+            "impact_preview",
+            "action_approval",
+            "file_diff",
+            "audit_trail",
         ],
         "endpoints": {
-            "tasks": "/a2a/tasks",
-            "simulations": "/api/v1/simulations",
+            "actions": "/api/v1/actions",
+            "pending": "/api/v1/actions/pending",
             "agents": "/api/v1/agents",
         },
         "contact": {
@@ -126,13 +136,21 @@ async def agent_card() -> dict:
 
 
 # Import and include routers
-from agent_polis.a2a.router import router as a2a_router
 from agent_polis.agents.router import router as agents_router
-from agent_polis.simulations.router import router as simulations_router
+from agent_polis.actions.router import router as actions_router
 
-app.include_router(a2a_router, prefix="/a2a", tags=["A2A Protocol"])
+# Core API routes
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["Agents"])
-app.include_router(simulations_router, prefix="/api/v1/simulations", tags=["Simulations"])
+app.include_router(actions_router, prefix="/api/v1/actions", tags=["Actions"])
+
+# Legacy routes (v0.1 compatibility - can be removed in future)
+try:
+    from agent_polis.a2a.router import router as a2a_router
+    from agent_polis.simulations.router import router as simulations_router
+    app.include_router(a2a_router, prefix="/a2a", tags=["Legacy - A2A"])
+    app.include_router(simulations_router, prefix="/api/v1/simulations", tags=["Legacy - Simulations"])
+except ImportError:
+    pass  # Legacy modules may be removed
 
 
 def cli() -> None:

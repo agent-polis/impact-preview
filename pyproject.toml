@@ -1,14 +1,14 @@
 [project]
 name = "agent-polis"
-version = "0.1.0"
-description = "Governance and coordination layer for AI agents with simulation-integrated decision-making"
+version = "0.2.0"
+description = "Impact preview for AI agents - see exactly what will change before any autonomous AI action executes"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 authors = [
     {name = "Agent Polis Contributors"}
 ]
-keywords = ["ai", "agents", "governance", "a2a", "simulation", "multi-agent"]
+keywords = ["ai", "agents", "impact-preview", "approval-workflow", "autonomous-agents", "safety"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

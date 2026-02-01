@@ -5,7 +5,7 @@ All events in the system inherit from DomainEvent and are immutable records
 of something that happened.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -23,7 +23,7 @@ class DomainEvent(BaseModel):
     event_id: UUID = Field(default_factory=uuid4, description="Unique event identifier")
     event_type: str = Field(description="Event type name (e.g., 'AgentRegistered')")
     stream_id: str = Field(description="Aggregate/stream identifier (e.g., 'agent:abc123')")
-    occurred_at: datetime = Field(default_factory=datetime.utcnow, description="When event occurred")
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When event occurred")
     data: dict[str, Any] = Field(default_factory=dict, description="Event payload")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Event metadata (actor, correlation, etc.)")
 
@@ -52,29 +52,9 @@ class AgentReputationChanged(DomainEvent):
     event_type: str = "AgentReputationChanged"
 
 
-# Simulation Events
-class SimulationCreated(DomainEvent):
-    """A simulation scenario was created."""
-    event_type: str = "SimulationCreated"
-
-
-class SimulationStarted(DomainEvent):
-    """A simulation execution started."""
-    event_type: str = "SimulationStarted"
-
-
-class SimulationCompleted(DomainEvent):
-    """A simulation execution completed."""
-    event_type: str = "SimulationCompleted"
-
-
-class SimulationFailed(DomainEvent):
-    """A simulation execution failed."""
-    event_type: str = "SimulationFailed"
-
-
+# Outcome Tracking Events (works with both actions and legacy simulations)
 class OutcomePredicted(DomainEvent):
-    """An outcome prediction was recorded for a simulation."""
+    """An outcome prediction was recorded."""
     event_type: str = "OutcomePredicted"
 
 
@@ -83,43 +63,104 @@ class OutcomeActualized(DomainEvent):
     event_type: str = "OutcomeActualized"
 
 
-# Governance Events (Phase 2)
-class ProposalCreated(DomainEvent):
-    """A proposal was created."""
-    event_type: str = "ProposalCreated"
+# Action Events (v0.2 - Impact Preview)
+class ActionProposed(DomainEvent):
+    """An action was proposed by an agent, awaiting approval."""
+    event_type: str = "ActionProposed"
 
 
-class VoteCast(DomainEvent):
-    """A vote was cast on a proposal."""
-    event_type: str = "VoteCast"
+class ActionPreviewGenerated(DomainEvent):
+    """Impact preview was generated for a proposed action."""
+    event_type: str = "ActionPreviewGenerated"
 
 
-class ProposalResolved(DomainEvent):
-    """A proposal voting concluded with a result."""
-    event_type: str = "ProposalResolved"
+class ActionApproved(DomainEvent):
+    """A proposed action was approved by a human."""
+    event_type: str = "ActionApproved"
+
+
+class ActionRejected(DomainEvent):
+    """A proposed action was rejected by a human."""
+    event_type: str = "ActionRejected"
+
+
+class ActionModified(DomainEvent):
+    """A proposed action was modified before approval."""
+    event_type: str = "ActionModified"
+
+
+class ActionExecuted(DomainEvent):
+    """An approved action was executed."""
+    event_type: str = "ActionExecuted"
+
+
+class ActionFailed(DomainEvent):
+    """An action execution failed."""
+    event_type: str = "ActionFailed"
+
+
+class ActionTimedOut(DomainEvent):
+    """A proposed action timed out waiting for approval."""
+    event_type: str = "ActionTimedOut"
 
 
 # Metering Events
+class ActionMetered(DomainEvent):
+    """An action preview/execution was metered for billing/limits."""
+    event_type: str = "ActionMetered"
+
+
+# Legacy Events (kept for backward compatibility with v0.1)
+class SimulationCreated(DomainEvent):
+    """[LEGACY] A simulation scenario was created."""
+    event_type: str = "SimulationCreated"
+
+
+class SimulationStarted(DomainEvent):
+    """[LEGACY] A simulation execution started."""
+    event_type: str = "SimulationStarted"
+
+
+class SimulationCompleted(DomainEvent):
+    """[LEGACY] A simulation execution completed."""
+    event_type: str = "SimulationCompleted"
+
+
+class SimulationFailed(DomainEvent):
+    """[LEGACY] A simulation execution failed."""
+    event_type: str = "SimulationFailed"
+
+
 class SimulationMetered(DomainEvent):
-    """A simulation was metered for billing/limits."""
+    """[LEGACY] A simulation was metered for billing/limits."""
     event_type: str = "SimulationMetered"
 
 
 # Event type registry for deserialization
 EVENT_TYPES: dict[str, type[DomainEvent]] = {
+    # Agent events
     "AgentRegistered": AgentRegistered,
     "AgentVerified": AgentVerified,
     "AgentSuspended": AgentSuspended,
     "AgentReputationChanged": AgentReputationChanged,
+    # Action events (v0.2 - Impact Preview)
+    "ActionProposed": ActionProposed,
+    "ActionPreviewGenerated": ActionPreviewGenerated,
+    "ActionApproved": ActionApproved,
+    "ActionRejected": ActionRejected,
+    "ActionModified": ActionModified,
+    "ActionExecuted": ActionExecuted,
+    "ActionFailed": ActionFailed,
+    "ActionTimedOut": ActionTimedOut,
+    "ActionMetered": ActionMetered,
+    # Outcome tracking
+    "OutcomePredicted": OutcomePredicted,
+    "OutcomeActualized": OutcomeActualized,
+    # Legacy simulation events (v0.1 compatibility)
     "SimulationCreated": SimulationCreated,
     "SimulationStarted": SimulationStarted,
     "SimulationCompleted": SimulationCompleted,
     "SimulationFailed": SimulationFailed,
-    "OutcomePredicted": OutcomePredicted,
-    "OutcomeActualized": OutcomeActualized,
-    "ProposalCreated": ProposalCreated,
-    "VoteCast": VoteCast,
-    "ProposalResolved": ProposalResolved,
     "SimulationMetered": SimulationMetered,
 }
 

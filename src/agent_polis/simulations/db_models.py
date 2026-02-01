@@ -2,15 +2,15 @@
 SQLAlchemy database models for simulations.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from agent_polis.shared.db import Base
+from agent_polis.shared.db import Base, JSONType
 
 if TYPE_CHECKING:
     from agent_polis.agents.db_models import Agent
@@ -57,7 +57,7 @@ class Simulation(Base):
     
     # Scenario definition
     scenario_definition: Mapped[dict[str, Any]] = mapped_column(
-        JSONB,
+        JSONType,
         nullable=False,
     )
     
@@ -69,18 +69,18 @@ class Simulation(Base):
     
     # Results
     result: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB,
+        JSONType,
         nullable=True,
     )
     
     # Predictions and actuals for tracking accuracy
     predicted_outcome: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB,
+        JSONType,
         nullable=True,
     )
     
     actual_outcome: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB,
+        JSONType,
         nullable=True,
     )
     
@@ -94,7 +94,7 @@ class Simulation(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
     )
     
     started_at: Mapped[datetime | None] = mapped_column(

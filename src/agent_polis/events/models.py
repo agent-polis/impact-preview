@@ -5,15 +5,15 @@ Events are stored in an append-only table with hash chaining for tamper detectio
 """
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, Index, Integer, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from agent_polis.shared.db import Base
+from agent_polis.shared.db import Base, JSONType
 
 
 class Event(Base):
@@ -39,16 +39,17 @@ class Event(Base):
     
     # Event type and data
     event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    event_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    event_data: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False)
     
-    # Metadata (actor, timestamp, correlation ID, etc.)
-    metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    # Event metadata (actor, timestamp, correlation ID, etc.)
+    # Note: called event_metadata to avoid conflict with SQLAlchemy's reserved 'metadata'
+    event_metadata: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False, default=dict)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
     )
     
     # Hash chain for tamper detection
@@ -101,7 +102,7 @@ class Event(Base):
             stream_version=stream_version,
             event_type=event_type,
             event_data=event_data,
-            metadata=metadata or {},
+            event_metadata=metadata or {},
             prev_hash=prev_hash,
         )
         event.hash = event.compute_hash()

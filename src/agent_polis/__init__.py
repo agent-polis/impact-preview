@@ -1,13 +1,21 @@
 """
-Agent Polis - Governance and coordination layer for AI agents.
+Agent Polis - Impact Preview for AI Agents
 
-This package provides simulation-integrated governance for multi-agent systems,
-built on the A2A protocol for interoperability.
+See exactly what will change before any AI agent action executes.
+Like "terraform plan" for autonomous AI agents.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Agent Polis Contributors"
 
 from agent_polis.main import app
+from agent_polis.sdk import AgentPolisClient, ActionRejectedError, ActionTimedOutError
 
-__all__ = ["app", "__version__"]
+__all__ = [
+    "app",
+    "__version__",
+    # SDK
+    "AgentPolisClient",
+    "ActionRejectedError",
+    "ActionTimedOutError",
+]

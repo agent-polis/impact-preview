@@ -1,7 +1,7 @@
 # Agent Polis Pivot: Impact Preview for AI Agents
 
 **Date**: 2026-01-30
-**Status**: Planning
+**Status**: v0.2.0 Implemented
 **Codename**: Leviathan (working name for pivot)
 
 ---
@@ -52,24 +52,26 @@ Developers want to use autonomous AI agents but don't trust them. Current soluti
 ## Reuse Plan
 
 ### Keep As-Is
-- [ ] Event sourcing infrastructure (perfect for audit trail)
-- [ ] Agent registration and authentication
-- [ ] Rate limiting and metering
-- [ ] Database schema (events table)
-- [ ] Docker/CI/CD infrastructure
-- [ ] FastAPI app structure
+- [x] Event sourcing infrastructure (perfect for audit trail)
+- [x] Agent registration and authentication
+- [x] Rate limiting and metering
+- [x] Database schema (events table)
+- [x] Docker/CI/CD infrastructure
+- [x] FastAPI app structure
 
 ### Modify
-- [ ] Rename: Simulations → Impact Analysis
-- [ ] Repurpose: E2B sandbox → Dry-run execution environment
-- [ ] Adapt: A2A endpoints → Action interception protocol
-- [ ] Redesign: Streamlit UI → Action preview dashboard
+- [x] Rename: Simulations → Actions (Impact Preview)
+- [x] Repurpose: E2B sandbox → Available for future dry-run
+- [x] Adapt: A2A endpoints → Action submission protocol
+- [x] Redesign: Streamlit UI → Action approval dashboard
 
 ### Build New
-- [ ] Action Interceptor SDK (Python package for agent frameworks)
-- [ ] Diff Generator (readable output of proposed changes)
-- [ ] Impact Analyzer (file, DB, API impact detection)
-- [ ] Cursor/Claude Code extension (optional, for direct integration)
+- [x] Action SDK (Python package with @require_approval)
+- [x] Diff Generator (readable output of proposed changes)
+- [x] Impact Analyzer (file operations)
+- [ ] Impact Analyzer (DB operations) - v0.3
+- [ ] Impact Analyzer (API calls) - v0.4
+- [ ] Cursor/Claude Code extension - v0.5
 
 ---
 
@@ -111,12 +113,13 @@ AFTER (Leviathan v0.2):
 
 ## Milestones
 
-### M1: Core Pivot (v0.2.0)
-- [ ] Rename/rebrand
-- [ ] Action interception protocol
-- [ ] File operation impact preview
-- [ ] Basic diff output
-- [ ] CLI approval workflow
+### M1: Core Pivot (v0.2.0) ✅ COMPLETE
+- [x] Rename/rebrand
+- [x] Action submission protocol
+- [x] File operation impact preview
+- [x] Basic diff output
+- [x] API approval workflow
+- [x] Streamlit approval dashboard
 
 ### M2: Database Support (v0.3.0)
 - [ ] SQL query interception

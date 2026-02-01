@@ -1,5 +1,7 @@
 """
-Streamlit demo application for Agent Polis.
+Agent Polis - Impact Preview Dashboard
+
+A Streamlit UI for reviewing and approving AI agent actions.
 
 Run with: streamlit run src/agent_polis/ui/app.py
 """
@@ -58,8 +60,8 @@ def api_post(endpoint: str, data: dict):
 def main():
     """Main Streamlit application."""
     st.set_page_config(
-        page_title="Agent Polis",
-        page_icon="🏛️",
+        page_title="Agent Polis - Impact Preview",
+        page_icon="🔍",
         layout="wide",
     )
     
@@ -67,8 +69,8 @@ def main():
     
     # Sidebar
     with st.sidebar:
-        st.title("🏛️ Agent Polis")
-        st.caption("Governance & Coordination for AI Agents")
+        st.title("🔍 Agent Polis")
+        st.caption("Impact Preview for AI Agents")
         
         st.divider()
         
@@ -89,7 +91,6 @@ def main():
             if agent:
                 st.success(f"Logged in as: **{agent['name']}**")
                 st.session_state.agent_name = agent["name"]
-                st.metric("Reputation", f"{agent['reputation_score']:.2f}")
             else:
                 st.error("Invalid API key")
         
@@ -98,225 +99,367 @@ def main():
         # Navigation
         page = st.radio(
             "Navigate",
-            ["Dashboard", "Simulations", "New Simulation", "Agents", "Events"],
+            ["Pending Approvals", "All Actions", "Submit Action", "Agents", "Dashboard"],
         )
     
     # Main content
-    if page == "Dashboard":
-        show_dashboard()
-    elif page == "Simulations":
-        show_simulations()
-    elif page == "New Simulation":
-        show_new_simulation()
+    if page == "Pending Approvals":
+        show_pending_approvals()
+    elif page == "All Actions":
+        show_all_actions()
+    elif page == "Submit Action":
+        show_submit_action()
     elif page == "Agents":
         show_agents()
-    elif page == "Events":
-        show_events()
+    elif page == "Dashboard":
+        show_dashboard()
 
 
-def show_dashboard():
-    """Show the main dashboard."""
-    st.title("Dashboard")
-    
-    # Health check
-    health = api_get("/health")
-    if health:
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Status", "🟢 Healthy" if health["status"] == "healthy" else "🔴 Unhealthy")
-        with col2:
-            st.metric("Version", health["version"])
-        with col3:
-            st.metric("Environment", health["environment"])
-    
-    st.divider()
-    
-    # Agent Card
-    st.subheader("A2A Agent Card")
-    agent_card = api_get("/.well-known/agent.json")
-    if agent_card:
-        st.json(agent_card)
-    
-    # Stats if logged in
-    if st.session_state.api_key:
-        st.divider()
-        st.subheader("Your Stats")
-        stats = api_get("/api/v1/agents/me/stats")
-        if stats:
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Total Simulations", stats["total_simulations"])
-            with col2:
-                st.metric("Successful", stats["successful_simulations"])
-            with col3:
-                st.metric("Failed", stats["failed_simulations"])
-            with col4:
-                st.metric(
-                    "This Month",
-                    f"{stats['simulations_this_month']}/{stats['monthly_limit']}",
-                )
-
-
-def show_simulations():
-    """Show simulations list."""
-    st.title("Simulations")
+def show_pending_approvals():
+    """Show pending actions awaiting approval."""
+    st.title("⏳ Pending Approvals")
+    st.caption("Review and approve/reject AI agent actions")
     
     if not st.session_state.api_key:
-        st.warning("Please enter your API key to view simulations")
+        st.warning("Please enter your API key to view pending actions")
         return
     
-    # Fetch simulations
-    sims = api_get("/api/v1/simulations?page_size=50")
-    if not sims:
-        st.info("No simulations found")
+    # Toggle to see all agents' pending actions
+    all_agents = st.checkbox("Show actions from all agents", value=True)
+    
+    # Fetch pending actions
+    pending = api_get(f"/api/v1/actions/pending?all_agents={str(all_agents).lower()}")
+    if not pending or not pending.get("actions"):
+        st.info("No pending actions! All clear 🎉")
         return
     
-    # Filter
-    status_filter = st.selectbox(
-        "Filter by status",
-        ["All", "pending", "running", "completed", "failed"],
-    )
+    st.metric("Pending Actions", pending["pending_count"])
+    st.divider()
     
-    # Display simulations
-    for sim in sims.get("simulations", []):
-        if status_filter != "All" and sim["status"] != status_filter:
-            continue
+    for action in pending["actions"]:
+        show_action_card(action, show_actions=True)
+
+
+def show_all_actions():
+    """Show all actions."""
+    st.title("📋 All Actions")
+    
+    if not st.session_state.api_key:
+        st.warning("Please enter your API key to view actions")
+        return
+    
+    # Filters
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        status_filter = st.selectbox(
+            "Filter by status",
+            ["All", "pending", "approved", "rejected", "executed", "failed", "timed_out"],
+        )
+    
+    # Build query
+    query = ""
+    if status_filter != "All":
+        query = f"?status={status_filter}"
+    
+    actions_resp = api_get(f"/api/v1/actions{query}")
+    if not actions_resp or not actions_resp.get("actions"):
+        st.info("No actions found")
+        return
+    
+    for action in actions_resp["actions"]:
+        show_action_card(action, show_actions=(action["status"] == "pending"))
+
+
+def show_action_card(action: dict, show_actions: bool = False):
+    """Display an action card with preview and approval controls."""
+    status_emoji = {
+        "pending": "⏳",
+        "approved": "✅",
+        "rejected": "❌",
+        "executed": "🚀",
+        "failed": "💥",
+        "timed_out": "⏰",
+    }.get(action["status"], "❓")
+    
+    risk_color = {
+        "low": "🟢",
+        "medium": "🟡",
+        "high": "🟠",
+        "critical": "🔴",
+    }
+    
+    preview = action.get("preview", {})
+    risk_level = preview.get("risk_level", "medium")
+    risk_emoji = risk_color.get(risk_level, "⚪")
+    
+    with st.expander(
+        f"{status_emoji} {risk_emoji} {action['action_type']}: {action['target'][:50]}",
+        expanded=action["status"] == "pending",
+    ):
+        # Header info
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.write(f"**Action Type:** {action['action_type']}")
+            st.write(f"**Status:** {action['status']}")
+        with col2:
+            st.write(f"**Risk Level:** {risk_level.upper()}")
+            if action.get("agent_name"):
+                st.write(f"**Agent:** {action['agent_name']}")
+        with col3:
+            st.write(f"**Created:** {action['created_at'][:19]}")
+            if action.get("expires_at"):
+                st.write(f"**Expires:** {action['expires_at'][:19]}")
         
-        status_emoji = {
-            "pending": "⏳",
-            "running": "🔄",
-            "completed": "✅",
-            "failed": "❌",
-        }.get(sim["status"], "❓")
+        st.divider()
         
-        with st.expander(
-            f"{status_emoji} {sim['scenario']['name']} - {sim['status']}",
-            expanded=sim["status"] == "running",
-        ):
-            col1, col2 = st.columns([2, 1])
+        # Description
+        st.subheader("Description")
+        st.write(action["description"])
+        
+        # Target
+        st.subheader("Target")
+        st.code(action["target"])
+        
+        # Preview / Diff
+        if preview:
+            st.subheader("Impact Preview")
+            
+            # Summary
+            st.write(f"**Summary:** {preview.get('summary', 'No summary')}")
+            
+            # Warnings
+            warnings = preview.get("warnings", [])
+            if warnings:
+                for warning in warnings:
+                    st.warning(warning)
+            
+            # Risk factors
+            risk_factors = preview.get("risk_factors", [])
+            if risk_factors:
+                st.write("**Risk Factors:**")
+                for factor in risk_factors:
+                    st.write(f"- {factor}")
+            
+            # File changes
+            file_changes = preview.get("file_changes", [])
+            if file_changes:
+                st.subheader("File Changes")
+                for change in file_changes:
+                    change_emoji = {
+                        "create": "🆕",
+                        "modify": "📝",
+                        "delete": "🗑️",
+                        "move": "📦",
+                    }.get(change.get("operation", ""), "❓")
+                    
+                    st.write(f"{change_emoji} **{change['path']}** ({change['operation']})")
+                    
+                    if change.get("lines_added") or change.get("lines_removed"):
+                        st.write(f"  +{change['lines_added']} -{change['lines_removed']} lines")
+                    
+                    if change.get("diff"):
+                        st.code(change["diff"], language="diff")
+            
+            # Reversibility
+            st.write(f"**Reversible:** {'Yes' if preview.get('is_reversible', True) else 'No'}")
+            if preview.get("reversal_instructions"):
+                st.write(f"**How to reverse:** {preview['reversal_instructions']}")
+        
+        # Actions (for pending items)
+        if show_actions and action["status"] == "pending":
+            st.divider()
+            st.subheader("Actions")
+            
+            col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.write(f"**ID:** `{sim['id']}`")
-                st.write(f"**Created:** {sim['created_at']}")
-                if sim.get("scenario", {}).get("description"):
-                    st.write(f"**Description:** {sim['scenario']['description']}")
+                if st.button("✅ Approve", key=f"approve_{action['id']}", type="primary"):
+                    result, status = api_post(
+                        f"/api/v1/actions/{action['id']}/approve",
+                        {"comment": "Approved via dashboard"},
+                    )
+                    if status in [200, 201]:
+                        st.success("Action approved!")
+                        st.rerun()
+                    else:
+                        st.error(f"Failed: {result}")
             
             with col2:
-                if sim["status"] == "pending":
-                    if st.button("Run", key=f"run_{sim['id']}"):
-                        result, status = api_post(f"/api/v1/simulations/{sim['id']}/run", {})
-                        if status == 200:
-                            st.success("Simulation started!")
+                reject_reason = st.text_input(
+                    "Rejection reason",
+                    key=f"reason_{action['id']}",
+                    placeholder="Why are you rejecting?",
+                )
+                if st.button("❌ Reject", key=f"reject_{action['id']}"):
+                    if not reject_reason:
+                        st.error("Please provide a reason for rejection")
+                    else:
+                        result, status = api_post(
+                            f"/api/v1/actions/{action['id']}/reject",
+                            {"reason": reject_reason},
+                        )
+                        if status in [200, 201]:
+                            st.success("Action rejected!")
                             st.rerun()
                         else:
                             st.error(f"Failed: {result}")
             
-            # Show result if available
-            if sim.get("result"):
-                st.divider()
-                st.subheader("Result")
-                result = sim["result"]
-                
-                if result.get("success"):
-                    st.success("Execution successful")
-                else:
-                    st.error(f"Execution failed: {result.get('error', 'Unknown error')}")
-                
-                if result.get("output"):
-                    st.write("**Output:**")
-                    st.json(result["output"])
-                
-                if result.get("stdout"):
-                    st.write("**Stdout:**")
-                    st.code(result["stdout"])
-                
-                if result.get("duration_ms"):
-                    st.write(f"**Duration:** {result['duration_ms']}ms")
+            with col3:
+                if action.get("approved_at"):
+                    if st.button("🚀 Execute", key=f"execute_{action['id']}"):
+                        result, status = api_post(
+                            f"/api/v1/actions/{action['id']}/execute",
+                            {},
+                        )
+                        if status in [200, 201]:
+                            st.success("Action executed!")
+                            st.rerun()
+                        else:
+                            st.error(f"Failed: {result}")
+        
+        # Show rejection reason if rejected
+        if action.get("rejection_reason"):
+            st.error(f"**Rejection reason:** {action['rejection_reason']}")
+        
+        # Show execution result
+        if action.get("execution_result"):
+            st.success("**Execution result:**")
+            st.json(action["execution_result"])
+        
+        if action.get("execution_error"):
+            st.error(f"**Execution error:** {action['execution_error']}")
 
 
-def show_new_simulation():
-    """Show form to create a new simulation."""
-    st.title("New Simulation")
+def show_submit_action():
+    """Form to submit a new action for approval."""
+    st.title("📤 Submit Action")
+    st.caption("Submit an action for human approval before execution")
     
     if not st.session_state.api_key:
-        st.warning("Please enter your API key to create simulations")
+        st.warning("Please enter your API key to submit actions")
         return
     
-    with st.form("new_simulation"):
-        name = st.text_input("Scenario Name", placeholder="My Test Scenario")
-        description = st.text_area("Description", placeholder="What this simulation tests...")
-        
-        code = st.text_area(
-            "Python Code",
-            height=300,
-            placeholder="""# Your simulation code here
-# The 'result' variable will be captured as output
-
-inputs_value = inputs.get('my_input', 'default')
-result = {"status": "success", "value": inputs_value * 2}
-print(f"Processed: {result}")
-""",
-            help="Python code to execute in the sandbox. Use 'result' variable for output.",
+    with st.form("submit_action"):
+        action_type = st.selectbox(
+            "Action Type",
+            ["file_write", "file_create", "file_delete", "file_move", 
+             "db_query", "db_execute", "api_call", "shell_command", "custom"],
         )
         
-        inputs_str = st.text_area(
-            "Inputs (JSON)",
-            value="{}",
-            help="JSON object of input variables",
+        target = st.text_input(
+            "Target",
+            placeholder="/path/to/file or https://api.example.com/endpoint",
+            help="The target of the action (file path, URL, table name, etc.)",
         )
         
-        timeout = st.slider("Timeout (seconds)", 10, 300, 60)
+        description = st.text_area(
+            "Description",
+            placeholder="What this action will do and why it's needed...",
+            help="Human-readable description for the reviewer",
+        )
         
-        run_immediately = st.checkbox("Run immediately after creation", value=True)
+        # Different payload fields based on action type
+        st.subheader("Payload")
         
-        submitted = st.form_submit_button("Create Simulation")
+        if action_type in ["file_write", "file_create"]:
+            content = st.text_area(
+                "File Content",
+                height=300,
+                placeholder="Content to write to the file...",
+            )
+            payload = {"content": content}
+        
+        elif action_type == "file_move":
+            destination = st.text_input(
+                "Destination Path",
+                placeholder="/new/path/to/file",
+            )
+            payload = {"destination": destination}
+        
+        elif action_type in ["db_query", "db_execute"]:
+            query = st.text_area(
+                "SQL Query",
+                height=200,
+                placeholder="SELECT * FROM users WHERE...",
+            )
+            payload = {"query": query}
+        
+        elif action_type == "api_call":
+            method = st.selectbox("HTTP Method", ["GET", "POST", "PUT", "PATCH", "DELETE"])
+            body = st.text_area("Request Body (JSON)", placeholder="{}")
+            payload = {"method": method, "body": body}
+        
+        elif action_type == "shell_command":
+            command = st.text_input(
+                "Command",
+                placeholder="npm install ...",
+            )
+            payload = {"command": command}
+        
+        else:
+            payload_str = st.text_area(
+                "Custom Payload (JSON)",
+                value="{}",
+            )
+            import json
+            try:
+                payload = json.loads(payload_str)
+            except json.JSONDecodeError:
+                payload = {}
+        
+        st.divider()
+        
+        # Options
+        col1, col2 = st.columns(2)
+        with col1:
+            timeout = st.slider("Approval Timeout (seconds)", 30, 3600, 300)
+        with col2:
+            auto_approve = st.checkbox(
+                "Auto-approve if low risk",
+                help="Automatically approve if assessed as low risk",
+            )
+        
+        context = st.text_area(
+            "Additional Context (optional)",
+            placeholder="Any additional context for the reviewer...",
+        )
+        
+        submitted = st.form_submit_button("Submit for Approval", type="primary")
         
         if submitted:
-            if not name or not code:
-                st.error("Name and code are required")
+            if not target or not description:
+                st.error("Target and description are required")
             else:
-                import json
-                try:
-                    inputs = json.loads(inputs_str)
-                except json.JSONDecodeError:
-                    st.error("Invalid JSON in inputs")
-                    return
-                
                 data = {
-                    "scenario": {
-                        "name": name,
-                        "description": description,
-                        "code": code,
-                        "inputs": inputs,
-                        "timeout_seconds": timeout,
-                    }
+                    "action_type": action_type,
+                    "target": target,
+                    "description": description,
+                    "payload": payload,
+                    "context": context if context else None,
+                    "timeout_seconds": timeout,
+                    "auto_approve_if_low_risk": auto_approve,
                 }
                 
-                result, status = api_post("/api/v1/simulations", data)
-                if status == 201:
-                    st.success(f"Simulation created: {result['id']}")
+                result, status = api_post("/api/v1/actions", data)
+                if status in [200, 201]:
+                    st.success(f"Action submitted! ID: {result['id']}")
                     
-                    if run_immediately:
-                        with st.spinner("Running simulation..."):
-                            run_result, run_status = api_post(
-                                f"/api/v1/simulations/{result['id']}/run", {}
-                            )
-                            if run_status == 200:
-                                if run_result.get("success"):
-                                    st.success("Simulation completed successfully!")
-                                else:
-                                    st.error(f"Simulation failed: {run_result.get('error')}")
-                                
-                                st.json(run_result)
-                            else:
-                                st.error(f"Run failed: {run_result}")
+                    if result.get("status") == "approved":
+                        st.info("Action was auto-approved (low risk)")
+                    else:
+                        st.info("Action is pending approval")
+                    
+                    # Show preview
+                    if result.get("preview"):
+                        st.subheader("Impact Preview")
+                        st.json(result["preview"])
                 else:
-                    st.error(f"Creation failed: {result}")
+                    st.error(f"Submission failed: {result}")
 
 
 def show_agents():
     """Show agents list."""
-    st.title("Agents")
+    st.title("🤖 Agents")
     
     # Registration form
     with st.expander("Register New Agent"):
@@ -347,39 +490,58 @@ def show_agents():
     if agents:
         for agent in agents.get("agents", []):
             status_emoji = "✅" if agent["verified"] else "⏳"
-            with st.expander(f"{status_emoji} {agent['name']} - Rep: {agent['reputation_score']:.2f}"):
+            with st.expander(f"{status_emoji} {agent['name']}"):
                 st.write(f"**Description:** {agent['description']}")
                 st.write(f"**Status:** {agent['status']}")
-                st.write(f"**Verified:** {agent['verified']}")
-                st.write(f"**Simulations:** {agent['simulation_count']}")
                 st.write(f"**Created:** {agent['created_at']}")
 
 
-def show_events():
-    """Show event audit trail."""
-    st.title("Event Audit Trail")
-    st.caption("Immutable record of all governance actions")
+def show_dashboard():
+    """Show the main dashboard."""
+    st.title("📊 Dashboard")
     
-    st.info(
-        "Events are stored in an append-only, hash-chained log for tamper detection. "
-        "This provides a complete audit trail for compliance."
-    )
+    # Health check
+    health = api_get("/health")
+    if health:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            status_text = "🟢 Healthy" if health["status"] == "healthy" else "🔴 Unhealthy"
+            st.metric("Status", status_text)
+        with col2:
+            st.metric("Version", health["version"])
+        with col3:
+            st.metric("Environment", health["environment"])
     
-    # Note: In a full implementation, we'd have an events API endpoint
-    st.warning("Event browsing API coming soon. Events are stored for each simulation.")
+    st.divider()
     
+    # Agent Card
+    st.subheader("Agent Capabilities")
+    agent_card = api_get("/.well-known/agent.json")
+    if agent_card:
+        st.json(agent_card)
+    
+    st.divider()
+    
+    # Quick stats if logged in
     if st.session_state.api_key:
-        # Show simulation events as example
-        sims = api_get("/api/v1/simulations?page_size=5")
-        if sims and sims.get("simulations"):
-            st.subheader("Recent Simulation Events")
-            for sim in sims["simulations"][:3]:
-                events = api_get(f"/api/v1/simulations/{sim['id']}/events")
-                if events:
-                    with st.expander(f"Events for: {sim['scenario']['name']}"):
-                        for event in events:
-                            st.write(f"**{event['type']}** at {event['created_at']}")
-                            st.json(event["data"])
+        st.subheader("Quick Stats")
+        
+        # Get pending count
+        pending = api_get("/api/v1/actions/pending?all_agents=true")
+        pending_count = pending.get("pending_count", 0) if pending else 0
+        
+        # Get my actions
+        my_actions = api_get("/api/v1/actions")
+        my_total = my_actions.get("total", 0) if my_actions else 0
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Pending Approvals", pending_count)
+        with col2:
+            st.metric("My Total Actions", my_total)
+        with col3:
+            if pending_count > 0:
+                st.warning(f"{pending_count} action(s) awaiting approval!")
 
 
 if __name__ == "__main__":

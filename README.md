@@ -1,36 +1,50 @@
-# 🏛️ Agent Polis
+# 🔍 Agent Polis
 
-**Governance and coordination layer for AI agents with simulation-integrated decision-making.**
+**Impact Preview for AI Agents - "Terraform plan" for autonomous AI actions**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![A2A Protocol](https://img.shields.io/badge/A2A-compatible-green.svg)](https://github.com/google/a2a-protocol)
 
-Agent Polis enables AI agents to coordinate, deliberate, and make decisions together. The unique value proposition: **test proposals in simulation before they execute** - giving agents (and their human principals) confidence in outcomes before committing.
+> See exactly what will change before any AI agent action executes.
 
-## 🚀 Features
+Agent Polis intercepts proposed actions from autonomous AI agents, analyzes their impact, shows you a diff preview of what will change, and only executes after human approval. Stop worrying about your AI agent deleting your production database.
 
-- **A2A Protocol Compatible**: Interoperable with the emerging agent-to-agent communication standard
-- **Simulation-Integrated Governance**: Run scenarios in isolated sandboxes before committing
-- **Event-Sourced Audit Trail**: Immutable, tamper-evident record of all governance actions
-- **Agent Registration & Authentication**: API key-based auth with reputation tracking
-- **Metering & Rate Limiting**: Built-in usage tracking for freemium/enterprise tiers
-- **CrewAI Integration**: Use simulations directly from your CrewAI agents
+## 🎯 The Problem
+
+Autonomous AI agents are powerful but dangerous. Recent incidents:
+
+- **Replit Agent** deleted a production database, then lied about it
+- **Cursor YOLO mode** deleted an entire system including itself
+- **Claude Code** learned to bypass safety restrictions via shell scripts
+
+Developers want to use AI agents but don't trust them. Current solutions show what agents *want* to do, not what *will* happen. There's no "terraform plan" equivalent for AI agent actions.
+
+## 🚀 The Solution
+
+```
+AI Agent proposes action → Agent Polis analyzes impact → Human reviews diff → Approve/Reject → Execute
+```
+
+```diff
+# Example: Agent wants to write to config.yaml
+- database_url: postgresql://localhost:5432/dev
++ database_url: postgresql://prod-server:5432/production
+! WARNING: Production database URL detected (CRITICAL RISK)
+```
+
+## ✨ Features
+
+- **Impact Preview**: See file diffs, risk assessment, and warnings before execution
+- **Approval Workflow**: Approve, reject, or modify proposed actions
+- **Risk Assessment**: Automatic detection of high-risk operations (production data, system files, etc.)
+- **Audit Trail**: Event-sourced log of every proposed and executed action
+- **SDK Integration**: Easy `@require_approval` decorator for your agent code
+- **Dashboard**: Streamlit UI for reviewing and approving actions
 
 ## 📦 Installation
 
 ```bash
-# Basic installation
 pip install agent-polis
-
-# With Streamlit UI
-pip install agent-polis[ui]
-
-# With CrewAI integration
-pip install agent-polis[crewai]
-
-# Everything
-pip install agent-polis[ui,crewai,dev]
 ```
 
 ## 🏃 Quick Start
@@ -41,7 +55,7 @@ pip install agent-polis[ui,crewai,dev]
 # Using Docker (recommended)
 docker-compose up -d
 
-# Or locally (requires PostgreSQL and Redis)
+# Or locally
 pip install -e .
 agent-polis
 ```
@@ -51,199 +65,188 @@ agent-polis
 ```bash
 curl -X POST http://localhost:8000/api/v1/agents/register \
   -H "Content-Type: application/json" \
-  -d '{"name": "my-agent", "description": "My first agent"}'
+  -d '{"name": "my-agent", "description": "My AI coding assistant"}'
 ```
 
-Save the returned API key - you'll need it for authentication.
+Save the returned API key.
 
-### 3. Create and Run a Simulation
+### 3. Submit an Action for Approval
 
 ```bash
-# Create simulation
-curl -X POST http://localhost:8000/api/v1/simulations \
+curl -X POST http://localhost:8000/api/v1/actions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: YOUR_API_KEY" \
   -d '{
-    "scenario": {
-      "name": "Test Addition",
-      "description": "Simple math test",
-      "code": "result = 2 + 2",
-      "inputs": {},
-      "timeout_seconds": 30
+    "action_type": "file_write",
+    "target": "/app/config.yaml",
+    "description": "Update database connection string",
+    "payload": {
+      "content": "database_url: postgresql://prod:5432/mydb"
     }
   }'
+```
 
-# Run the simulation (replace SIMULATION_ID)
-curl -X POST http://localhost:8000/api/v1/simulations/SIMULATION_ID/run \
+### 4. Review the Impact Preview
+
+```bash
+curl http://localhost:8000/api/v1/actions/ACTION_ID/preview \
   -H "X-API-Key: YOUR_API_KEY"
 ```
 
-### 4. Use with CrewAI
+Response:
+```json
+{
+  "risk_level": "high",
+  "risk_factors": ["Production pattern detected: prod"],
+  "file_changes": [{
+    "path": "/app/config.yaml",
+    "operation": "modify",
+    "diff": "...",
+    "lines_added": 1,
+    "lines_removed": 1
+  }],
+  "warnings": ["This change affects production configuration"]
+}
+```
+
+### 5. Approve or Reject
+
+```bash
+# Approve
+curl -X POST http://localhost:8000/api/v1/actions/ACTION_ID/approve \
+  -H "X-API-Key: YOUR_API_KEY"
+
+# Or reject
+curl -X POST http://localhost:8000/api/v1/actions/ACTION_ID/reject \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{"reason": "Too risky for production"}'
+```
+
+## 🐍 SDK Usage
+
+Use the SDK to wrap your agent's dangerous operations:
 
 ```python
-from agent_polis.integrations.crewai import create_crewai_tool
+from agent_polis.sdk import AgentPolisClient
 
-# Create the tool
-polis_tool = create_crewai_tool(
+client = AgentPolisClient(
     api_url="http://localhost:8000",
     api_key="YOUR_API_KEY"
 )
 
-# Use in your crew
-from crewai import Agent
+# Decorator approach - blocks until approved
+@client.require_approval(action_type="file_write")
+def write_config(path: str, content: str):
+    with open(path, 'w') as f:
+        f.write(content)
 
-analyst = Agent(
-    role="Risk Analyst",
-    goal="Validate plans before execution",
-    tools=[polis_tool],
+# Now this will:
+# 1. Submit for approval
+# 2. Wait for human to approve/reject
+# 3. Execute only if approved
+write_config("/etc/myapp/config.yaml", "new content")
+
+# Or manual approach
+action = client.submit_action(
+    action_type="file_delete",
+    target="/important/file.txt",
+    description="Clean up old data",
 )
+
+# Show preview to user
+preview = client.get_preview(action["id"])
+print(f"Risk: {preview['risk_level']}")
+print(f"Changes: {preview['summary']}")
+
+# Wait for approval
+client.wait_for_approval(action["id"], timeout=300)
+
+# Execute after approval
+client.execute(action["id"])
 ```
+
+## 🖥️ Dashboard
+
+Launch the Streamlit dashboard to review pending actions:
+
+```bash
+streamlit run src/agent_polis/ui/app.py
+```
+
+![Dashboard Screenshot](docs/images/dashboard.png)
+
+## 📚 API Reference
+
+### Actions API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/actions` | POST | Submit action for approval |
+| `/api/v1/actions` | GET | List your actions |
+| `/api/v1/actions/pending` | GET | List pending approvals |
+| `/api/v1/actions/{id}` | GET | Get action details |
+| `/api/v1/actions/{id}/preview` | GET | Get impact preview |
+| `/api/v1/actions/{id}/diff` | GET | Get diff output |
+| `/api/v1/actions/{id}/approve` | POST | Approve action |
+| `/api/v1/actions/{id}/reject` | POST | Reject action |
+| `/api/v1/actions/{id}/execute` | POST | Execute approved action |
+
+### Action Types
+
+- `file_write` - Write content to a file
+- `file_create` - Create a new file
+- `file_delete` - Delete a file
+- `file_move` - Move/rename a file
+- `db_query` - Execute a database query (read)
+- `db_execute` - Execute a database statement (write)
+- `api_call` - Make an HTTP request
+- `shell_command` - Run a shell command
+- `custom` - Custom action type
+
+### Risk Levels
+
+- **Low**: Read operations, safe changes
+- **Medium**: Write operations to non-critical files
+- **High**: Delete operations, system files
+- **Critical**: Production data, irreversible changes
 
 ## 🔧 Configuration
 
-Copy `.env.example` to `.env` and configure:
-
 ```bash
-# Required for production
+# .env
 SECRET_KEY=your-secret-key
 DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/agent_polis
 REDIS_URL=redis://localhost:6379/0
 
-# For sandbox execution (get key at https://e2b.dev)
-E2B_API_KEY=your-e2b-key
-
 # Optional
-FREE_TIER_SIMULATIONS_PER_MONTH=100
+FREE_TIER_ACTIONS_PER_MONTH=100
 LOG_LEVEL=INFO
 ```
 
-## 📚 API Reference
+## 🗺️ Roadmap
 
-### A2A Protocol Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/.well-known/agent.json` | GET | Agent discovery card |
-| `/a2a/tasks/send` | POST | Send task/message (JSON-RPC) |
-| `/a2a/tasks/{id}` | GET | Get task status |
-| `/a2a/tasks/{id}/cancel` | POST | Cancel task |
-
-### Agent Management
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/agents/register` | POST | Register new agent |
-| `/api/v1/agents/me` | GET | Get current agent profile |
-| `/api/v1/agents/me/stats` | GET | Get usage statistics |
-| `/api/v1/agents/{name}` | GET | Get agent by name |
-| `/api/v1/agents` | GET | List all agents |
-
-### Simulations
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/simulations` | POST | Create simulation |
-| `/api/v1/simulations` | GET | List my simulations |
-| `/api/v1/simulations/{id}` | GET | Get simulation details |
-| `/api/v1/simulations/{id}/run` | POST | Execute simulation |
-| `/api/v1/simulations/{id}/results` | GET | Get execution results |
-| `/api/v1/simulations/{id}/predict` | POST | Record outcome prediction |
-| `/api/v1/simulations/{id}/actualize` | POST | Record actual outcome |
-| `/api/v1/simulations/{id}/events` | GET | Get audit trail |
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        API GATEWAY                              │
-│                    (FastAPI / OpenAPI)                          │
-│              /.well-known/agent.json (A2A discovery)            │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │
-┌─────────────────────────┴───────────────────────────────────────┐
-│                     CORE MODULES (Python)                        │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   A2A        │  │  Governance  │  │  Simulation  │          │
-│  │   Server     │  │  Engine      │  │  Orchestrator│          │
-│  │              │  │  (Phase 2)   │  │              │          │
-│  │ - Discovery  │  │ - Proposals  │  │ - Scenarios  │          │
-│  │ - Tasks      │  │ - Voting     │  │ - Sandbox    │          │
-│  │ - Messages   │  │ - Sanctions  │  │ - Outcomes   │          │
-│  └──────────────┘  └──────────────┘  └──────────────┘          │
-│                           │                                      │
-│              ┌────────────┴────────────┐                        │
-│              │       EVENT BUS         │                        │
-│              │  (in-process pub/sub)   │                        │
-│              └────────────┬────────────┘                        │
-└───────────────────────────┼─────────────────────────────────────┘
-                            │
-┌───────────────────────────┴─────────────────────────────────────┐
-│                       DATA LAYER                                 │
-│                                                                  │
-│  ┌─────────────────────┐    ┌─────────────────────┐            │
-│  │    EVENT STORE      │    │    READ MODELS      │            │
-│  │    (PostgreSQL)     │    │    (PostgreSQL)     │            │
-│  │                     │    │                     │            │
-│  │ - Append-only       │    │ - agents            │            │
-│  │ - Hash chain        │    │ - simulations       │            │
-│  │ - Tamper-evident    │    │ - proposals         │            │
-│  └─────────────────────┘    └─────────────────────┘            │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## 🎯 Roadmap
-
-### Phase 1 (Current): Simulation Core ✅
-- A2A-compatible server
-- Agent registration and auth
-- E2B sandbox integration
-- Event-sourced audit trail
-- Basic metering
-
-### Phase 2: Governance Layer
-- Proposals with structured debate
-- Multiple voting mechanisms (majority, quadratic, supermajority)
-- Graduated sanctions system
-- Conflict resolution
-- Reputation based on prediction accuracy
-
-### Phase 3: Full Polis
-- Working groups and task coordination
-- Liquid democracy with accountability
-- Conviction voting for continuous funding
-- Inter-polis federation protocols
+| Version | Focus | Status |
+|---------|-------|--------|
+| v0.2.0 | File operation preview | Current |
+| v0.3.0 | Database operation preview | Planned |
+| v0.4.0 | API call preview | Planned |
+| v0.5.0 | IDE integrations (Cursor, VS Code) | Planned |
+| v1.0.0 | Production ready | Planned |
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
-
 ```bash
-# Setup development environment
 git clone https://github.com/agent-polis/agent-polis.git
 cd agent-polis
 pip install -e .[dev]
 pre-commit install
-
-# Run tests
 pytest
-
-# Run linting
-ruff check .
-mypy src/
 ```
 
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-## 🔗 Links
-
-- [Documentation](https://agent-polis.github.io/docs)
-- [A2A Protocol](https://github.com/google/a2a-protocol)
-- [E2B Sandbox](https://e2b.dev)
-- [CrewAI](https://github.com/joaomdmoura/crewAI)
-
 ---
 
-Built with ❤️ for the agentic future.
+Built for developers who want AI agents they can actually trust.

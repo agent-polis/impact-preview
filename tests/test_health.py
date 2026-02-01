@@ -29,4 +29,6 @@ async def test_agent_card(client: AsyncClient):
     assert "protocol" in data
     assert data["protocol"] == "a2a/1.0"
     assert "capabilities" in data
-    assert "simulation" in data["capabilities"]
+    # v0.2 capabilities focus on impact preview
+    assert "impact_preview" in data["capabilities"]
+    assert "action_approval" in data["capabilities"]

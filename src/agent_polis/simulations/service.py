@@ -2,7 +2,7 @@
 Simulation service - business logic for simulation management.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 import structlog
@@ -110,7 +110,7 @@ class SimulationService:
         
         # Update status
         simulation.status = "running"
-        simulation.started_at = datetime.utcnow()
+        simulation.started_at = datetime.now(timezone.utc)
         await self.session.flush()
         
         # Record start event
@@ -147,7 +147,7 @@ class SimulationService:
             # Update simulation with result
             simulation.result = result.model_dump()
             simulation.status = "completed" if result.success else "failed"
-            simulation.completed_at = datetime.utcnow()
+            simulation.completed_at = datetime.now(timezone.utc)
             
             # Increment agent's simulation count
             creator = await self.session.get(Agent, simulation.creator_id)
@@ -206,7 +206,7 @@ class SimulationService:
         except Exception as e:
             # Handle execution errors
             simulation.status = "failed"
-            simulation.completed_at = datetime.utcnow()
+            simulation.completed_at = datetime.now(timezone.utc)
             simulation.result = {
                 "success": False,
                 "error": str(e),
@@ -345,7 +345,7 @@ class SimulationService:
             "status": simulation.status,
             "success": result.success,
             "result": result.model_dump() if result else None,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         
         try:

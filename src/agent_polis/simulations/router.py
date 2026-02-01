@@ -270,7 +270,7 @@ async def get_simulation_events(
             "id": str(e.id),
             "type": e.event_type,
             "data": e.event_data,
-            "metadata": e.metadata,
+            "metadata": e.event_metadata,
             "created_at": e.created_at.isoformat(),
         }
         for e in events

@@ -5,7 +5,7 @@ These models follow the A2A protocol specification for task management
 and agent communication.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
@@ -63,8 +63,8 @@ class Task(BaseModel):
     id: str = Field(default_factory=lambda: uuid4().hex, description="Task ID")
     status: TaskStatus = Field(default=TaskStatus.SUBMITTED, description="Task status")
     messages: list[Message] = Field(default_factory=list, description="Conversation history")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     result: dict[str, Any] | None = Field(default=None, description="Task result if completed")
     error: str | None = Field(default=None, description="Error message if failed")
 

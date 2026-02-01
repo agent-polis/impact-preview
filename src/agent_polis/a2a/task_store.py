@@ -5,7 +5,7 @@ For MVP, tasks are stored in memory. In production, this would be
 backed by Redis or the database for persistence and scaling.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict
 
 from agent_polis.a2a.models import Task
@@ -23,7 +23,7 @@ class TaskStore:
     
     async def save(self, task: Task) -> None:
         """Save or update a task."""
-        task.updated_at = datetime.utcnow()
+        task.updated_at = datetime.now(timezone.utc)
         self._tasks[task.id] = task
     
     async def get(self, task_id: str) -> Task | None:
@@ -48,7 +48,7 @@ class TaskStore:
     async def cleanup_old(self, max_age_hours: int = 24) -> int:
         """Remove tasks older than max_age_hours. Returns count removed."""
         from datetime import timedelta
-        cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
         old_ids = [
             tid for tid, task in self._tasks.items()
             if task.updated_at < cutoff
