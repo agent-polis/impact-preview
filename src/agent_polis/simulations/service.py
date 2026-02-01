@@ -145,7 +145,7 @@ class SimulationService:
             )
             
             # Update simulation with result
-            simulation.result = result.model_dump()
+            simulation.result = result.model_dump(mode='json')
             simulation.status = "completed" if result.success else "failed"
             simulation.completed_at = datetime.now(timezone.utc)
             
@@ -344,7 +344,7 @@ class SimulationService:
             "simulation_id": str(simulation.id),
             "status": simulation.status,
             "success": result.success,
-            "result": result.model_dump() if result else None,
+            "result": result.model_dump(mode='json') if result else None,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         

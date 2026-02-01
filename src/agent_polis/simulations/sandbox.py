@@ -245,6 +245,14 @@ class SandboxExecutor:
                     "True": True,
                     "False": False,
                     "None": None,
+                    # Common exceptions
+                    "Exception": Exception,
+                    "ValueError": ValueError,
+                    "TypeError": TypeError,
+                    "KeyError": KeyError,
+                    "IndexError": IndexError,
+                    "RuntimeError": RuntimeError,
+                    "AttributeError": AttributeError,
                 },
             }
             
