@@ -41,148 +41,20 @@ AI Agent proposes action → Agent Polis analyzes impact → Human reviews diff 
 - **SDK Integration**: Easy `@require_approval` decorator for your agent code
 - **Dashboard**: Streamlit UI for reviewing and approving actions
 
-## 📦 Installation
+## 🚀 Quick Start (2 minutes)
+
+The fastest way to try Agent Polis is the **MCP server** with Claude Desktop or Cursor.
+
+### 1. Install & Run
 
 ```bash
-pip install agent-polis
-```
-
-## 🏃 Quick Start
-
-### 1. Start the Server
-
-```bash
-# Using Docker (recommended)
-docker-compose up -d
-
-# Or locally
-pip install -e .
-agent-polis
-```
-
-### 2. Register an Agent
-
-```bash
-curl -X POST http://localhost:8000/api/v1/agents/register \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-agent", "description": "My AI coding assistant"}'
-```
-
-Save the returned API key.
-
-### 3. Submit an Action for Approval
-
-```bash
-curl -X POST http://localhost:8000/api/v1/actions \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{
-    "action_type": "file_write",
-    "target": "/app/config.yaml",
-    "description": "Update database connection string",
-    "payload": {
-      "content": "database_url: postgresql://prod:5432/mydb"
-    }
-  }'
-```
-
-### 4. Review the Impact Preview
-
-```bash
-curl http://localhost:8000/api/v1/actions/ACTION_ID/preview \
-  -H "X-API-Key: YOUR_API_KEY"
-```
-
-Response:
-```json
-{
-  "risk_level": "high",
-  "risk_factors": ["Production pattern detected: prod"],
-  "file_changes": [{
-    "path": "/app/config.yaml",
-    "operation": "modify",
-    "diff": "...",
-    "lines_added": 1,
-    "lines_removed": 1
-  }],
-  "warnings": ["This change affects production configuration"]
-}
-```
-
-### 5. Approve or Reject
-
-```bash
-# Approve
-curl -X POST http://localhost:8000/api/v1/actions/ACTION_ID/approve \
-  -H "X-API-Key: YOUR_API_KEY"
-
-# Or reject
-curl -X POST http://localhost:8000/api/v1/actions/ACTION_ID/reject \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{"reason": "Too risky for production"}'
-```
-
-## 🐍 SDK Usage
-
-Use the SDK to wrap your agent's dangerous operations:
-
-```python
-from agent_polis.sdk import AgentPolisClient
-
-client = AgentPolisClient(
-    api_url="http://localhost:8000",
-    api_key="YOUR_API_KEY"
-)
-
-# Decorator approach - blocks until approved
-@client.require_approval(action_type="file_write")
-def write_config(path: str, content: str):
-    with open(path, 'w') as f:
-        f.write(content)
-
-# Now this will:
-# 1. Submit for approval
-# 2. Wait for human to approve/reject
-# 3. Execute only if approved
-write_config("/etc/myapp/config.yaml", "new content")
-
-# Or manual approach
-action = client.submit_action(
-    action_type="file_delete",
-    target="/important/file.txt",
-    description="Clean up old data",
-)
-
-# Show preview to user
-preview = client.get_preview(action["id"])
-print(f"Risk: {preview['risk_level']}")
-print(f"Changes: {preview['summary']}")
-
-# Wait for approval
-client.wait_for_approval(action["id"], timeout=300)
-
-# Execute after approval
-client.execute(action["id"])
-```
-
-## 🔌 MCP Server (Claude Desktop, Cursor)
-
-Agent Polis includes an MCP server for direct integration with Claude Desktop, Cursor, and other MCP-compatible clients. **This is the fastest way to try it**.
-
-### 1. Start the MCP Server
-
-```bash
-# Install and run
 pip install agent-polis
 agent-polis-mcp
-
-# Or with uvicorn
-uvicorn agent_polis.mcp_server:mcp.app --host 0.0.0.0 --port 8000
 ```
 
 ### 2. Configure Claude Desktop
 
-Add to `~/.config/claude/claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`):
+Add to your config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
@@ -194,33 +66,90 @@ Add to `~/.config/claude/claude_desktop_config.json` (macOS: `~/Library/Applicat
 }
 ```
 
-### 3. Use It
+### 3. Try It
 
-Now when you ask Claude to edit files, it has access to these tools:
+Ask Claude to edit a file - it now has these tools:
 
-| Tool | Description |
-|------|-------------|
-| `preview_file_write` | See diff before any file edit |
-| `preview_file_create` | Preview new file creation |
-| `preview_file_delete` | Preview deletions (shows what will be lost) |
-| `preview_shell_command` | Analyze shell commands for dangerous patterns |
-| `preview_database_query` | Check SQL queries before execution |
-| `check_path_risk` | Quick risk check for any file path |
+| Tool | What it does |
+|------|--------------|
+| `preview_file_write` | Shows diff before any edit |
+| `preview_file_delete` | Shows what will be lost |
+| `preview_shell_command` | Flags dangerous commands |
+| `check_path_risk` | Quick risk check for any path |
 
 **Example prompt:**
 > "Preview what would happen if you changed the database URL in config.yaml to point to production"
 
-Claude will now use `preview_file_write` to show you the diff and risk assessment *before* making any changes.
+Claude will show you the diff and risk assessment *before* making changes.
+
+---
+
+## 📦 Full Server Installation
+
+For the complete approval workflow with dashboard and API:
+
+```bash
+# Using Docker (recommended)
+docker-compose up -d
+
+# Or locally
+pip install agent-polis
+agent-polis
+```
+
+### Register an Agent
+
+```bash
+curl -X POST http://localhost:8000/api/v1/agents/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-agent", "description": "My AI coding assistant"}'
+```
+
+### Submit Action → Review → Approve
+
+```bash
+# Submit
+curl -X POST http://localhost:8000/api/v1/actions \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action_type": "file_write", "target": "/app/config.yaml", "description": "Update DB URL", "payload": {"content": "db: prod"}}'
+
+# Preview
+curl http://localhost:8000/api/v1/actions/ACTION_ID/preview -H "X-API-Key: YOUR_API_KEY"
+
+# Approve (or reject)
+curl -X POST http://localhost:8000/api/v1/actions/ACTION_ID/approve -H "X-API-Key: YOUR_API_KEY"
+```
+
+---
+
+## 🐍 SDK Integration
+
+Wrap your agent's dangerous operations:
+
+```python
+from agent_polis import AgentPolisClient
+
+client = AgentPolisClient(api_url="http://localhost:8000", api_key="YOUR_KEY")
+
+# Decorator approach - blocks until human approves
+@client.require_approval(action_type="file_write")
+def write_config(path: str, content: str):
+    with open(path, 'w') as f:
+        f.write(content)
+
+# This will: submit → wait for approval → execute only if approved
+write_config("/etc/myapp/config.yaml", "new content")
+```
 
 ## 🖥️ Dashboard
 
 Launch the Streamlit dashboard to review pending actions:
 
 ```bash
+pip install agent-polis[ui]
 streamlit run src/agent_polis/ui/app.py
 ```
-
-![Dashboard Screenshot](docs/images/dashboard.png)
 
 ## 📚 API Reference
 
