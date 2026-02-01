@@ -1,6 +1,6 @@
 [project]
 name = "impact-preview"
-version = "0.2.0"
+version = "0.2.1"
 description = "Impact preview for AI agents - see exactly what will change before any autonomous AI action executes"
 readme = "README.md"
 license = {text = "MIT"}
