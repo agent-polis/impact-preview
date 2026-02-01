@@ -128,3 +128,4 @@ Thumbs.db
 *.sqlite3
 data/
 logs/
+.mcpregistry_*
