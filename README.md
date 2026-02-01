@@ -213,7 +213,7 @@ LOG_LEVEL=INFO
 
 ```bash
 git clone https://github.com/agent-polis/Leviathan.git
-cd agent-polis
+cd Leviathan
 pip install -e .[dev]
 pre-commit install
 pytest
