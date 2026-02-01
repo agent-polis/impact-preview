@@ -58,9 +58,9 @@ crewai = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/agent-polis/agent-polis"
-Documentation = "https://agent-polis.github.io/docs"
-Repository = "https://github.com/agent-polis/agent-polis"
+Homepage = "https://github.com/agent-polis/Leviathan"
+Documentation = "https://github.com/agent-polis/Leviathan#readme"
+Repository = "https://github.com/agent-polis/Leviathan"
 
 [project.scripts]
 agent-polis = "agent_polis.main:cli"

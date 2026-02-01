@@ -212,7 +212,7 @@ LOG_LEVEL=INFO
 ## 🤝 Contributing
 
 ```bash
-git clone https://github.com/agent-polis/agent-polis.git
+git clone https://github.com/agent-polis/Leviathan.git
 cd agent-polis
 pip install -e .[dev]
 pre-commit install
