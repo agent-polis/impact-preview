@@ -17,14 +17,14 @@ logger = structlog.get_logger()
 class ProjectionHandler:
     """
     Base class for projection handlers.
-    
+
     Projections listen to events and update read models accordingly.
     They can be replayed from the event store to rebuild read models.
     """
-    
+
     def __init__(self, session: AsyncSession):
         self.session = session
-    
+
     async def handle(self, event: DomainEvent) -> None:
         """Handle an event and update projections."""
         raise NotImplementedError
@@ -109,24 +109,24 @@ async def project_simulation_metered(event: DomainEvent) -> None:
 async def rebuild_projections(session: AsyncSession, stream_id: str) -> None:
     """
     Rebuild projections for a stream by replaying all its events.
-    
+
     This is useful for:
     - Fixing corrupted read models
     - Adding new projections after the fact
     - Migrating data
     """
-    from agent_polis.events.store import EventStore
     from agent_polis.events.bus import publish_event
-    
+    from agent_polis.events.store import EventStore
+
     store = EventStore(session)
     events = await store.get_stream(stream_id)
-    
+
     logger.info(
         "Rebuilding projections",
         stream_id=stream_id,
         event_count=len(events),
     )
-    
+
     for event in events:
         # Convert DB event to domain event and republish
         from agent_polis.events.types import deserialize_event
@@ -139,5 +139,5 @@ async def rebuild_projections(session: AsyncSession, stream_id: str) -> None:
             }
         )
         await publish_event(domain_event)
-    
+
     logger.info("Projection rebuild complete", stream_id=stream_id)

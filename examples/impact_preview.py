@@ -12,16 +12,16 @@ import sys
 # Add parent directory to path for local development
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from agent_polis.sdk import AgentPolisClient, ActionRejectedError, ActionTimedOutError
+from agent_polis.sdk import ActionRejectedError, ActionTimedOutError, AgentPolisClient
 
 
 def main():
     """Demonstrate the impact preview workflow."""
-    
+
     # Initialize client
     api_url = os.getenv("API_URL", "http://localhost:8000")
     api_key = os.getenv("AGENT_API_KEY", "")
-    
+
     if not api_key:
         print("Please set AGENT_API_KEY environment variable")
         print("Register an agent first:")
@@ -29,16 +29,16 @@ def main():
         print('    -H "Content-Type: application/json" \\')
         print('    -d \'{"name": "my-agent", "description": "Example agent"}\'')
         return
-    
+
     client = AgentPolisClient(api_url=api_url, api_key=api_key)
-    
+
     print("=" * 60)
     print("Agent Polis - Impact Preview Example")
     print("=" * 60)
-    
+
     # Example 1: Submit a file write action
     print("\n1. Submitting a file write action...")
-    
+
     action = client.submit_action(
         action_type="file_write",
         target="/app/config.yaml",
@@ -54,50 +54,50 @@ database:
         },
         context="AI agent wants to update config for deployment",
     )
-    
+
     print(f"   Action ID: {action['id']}")
     print(f"   Status: {action['status']}")
-    
+
     # Example 2: Get the preview
     print("\n2. Getting impact preview...")
-    
+
     preview = client.get_preview(action["id"])
     print(f"   Risk Level: {preview['risk_level']}")
     print(f"   Summary: {preview['summary']}")
-    
+
     if preview.get("warnings"):
         print("   Warnings:")
         for warning in preview["warnings"]:
             print(f"     - {warning}")
-    
+
     if preview.get("risk_factors"):
         print("   Risk Factors:")
         for factor in preview["risk_factors"]:
             print(f"     - {factor}")
-    
+
     # Example 3: Get the diff
     print("\n3. Getting file diff...")
-    
+
     diff_result = client.get_diff(action["id"], format="plain")
     print("   Diff output:")
     for line in diff_result["diff"].split("\n")[:10]:
         print(f"     {line}")
-    
+
     # Example 4: Approve or reject
     print("\n4. Action is pending approval...")
     print("   In a real workflow, a human would review and approve/reject.")
     print("   For this demo, we'll auto-approve.")
-    
+
     approved = client.approve(action["id"], comment="Approved via example script")
     print(f"   Status after approval: {approved['status']}")
-    
+
     # Example 5: Execute
     print("\n5. Executing approved action...")
-    
+
     executed = client.execute(action["id"])
     print(f"   Final status: {executed['status']}")
     print(f"   Executed at: {executed['executed_at']}")
-    
+
     print("\n" + "=" * 60)
     print("Example complete!")
     print("=" * 60)
@@ -105,12 +105,12 @@ database:
 
 def decorator_example():
     """Example using the @require_approval decorator."""
-    
+
     api_url = os.getenv("API_URL", "http://localhost:8000")
     api_key = os.getenv("AGENT_API_KEY", "")
-    
+
     client = AgentPolisClient(api_url=api_url, api_key=api_key)
-    
+
     # Define a dangerous function with approval required
     @client.require_approval(action_type="file_write", auto_approve_if_low_risk=True)
     def write_to_temp_file(path: str, content: str):
@@ -121,7 +121,7 @@ def decorator_example():
         #     f.write(content)
         print("Write complete!")
         return True
-    
+
     # When called, this will:
     # 1. Submit action for approval
     # 2. Wait for approval (or auto-approve if low risk)

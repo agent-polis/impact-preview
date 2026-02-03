@@ -10,12 +10,12 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from agent_polis.shared.db import Base
+from agent_polis.agents.db_models import Agent  # noqa: F401
 from agent_polis.config import settings
 
 # Import all models to register them with Base.metadata
 from agent_polis.events.models import Event  # noqa: F401
-from agent_polis.agents.db_models import Agent  # noqa: F401
+from agent_polis.shared.db import Base
 from agent_polis.simulations.db_models import Simulation  # noqa: F401
 
 # Alembic Config object
@@ -35,7 +35,7 @@ target_metadata = Base.metadata
 def run_migrations_offline() -> None:
     """
     Run migrations in 'offline' mode.
-    
+
     This configures the context with just a URL and not an Engine.
     Calls to context.execute() emit the given string to the script output.
     """
@@ -76,7 +76,7 @@ async def run_async_migrations() -> None:
 def run_migrations_online() -> None:
     """
     Run migrations in 'online' mode.
-    
+
     Creates an AsyncEngine and associates a connection with the context.
     """
     asyncio.run(run_async_migrations())

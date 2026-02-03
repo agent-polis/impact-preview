@@ -1,6 +1,6 @@
 [project]
 name = "impact-preview"
-version = "0.2.1"
+version = "0.2.2"
 description = "Impact preview for AI agents - see exactly what will change before any autonomous AI action executes"
 readme = "README.md"
 license = {text = "MIT"}
@@ -80,6 +80,7 @@ sources = ["src"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -94,7 +95,7 @@ ignore = [
     "B008",  # do not perform function calls in argument defaults
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["agent_polis"]
 
 [tool.mypy]

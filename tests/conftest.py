@@ -3,24 +3,18 @@ Pytest configuration and fixtures for Agent Polis tests.
 """
 
 import asyncio
-from typing import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator
 from uuid import uuid4
 
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-
-from agent_polis.main import app
-from agent_polis.shared.db import Base, get_db
-from agent_polis.config import settings
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Import all models to ensure they're registered with Base
-from agent_polis.agents.db_models import Agent
-from agent_polis.events.models import Event
-from agent_polis.actions.db_models import Action
-
+from agent_polis.main import app
+from agent_polis.shared.db import Base, get_db
 
 # Use in-memory SQLite for tests (or test PostgreSQL if available)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -41,15 +35,15 @@ async def test_engine():
         TEST_DATABASE_URL,
         echo=False,
     )
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     yield engine
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
-    
+
     await engine.dispose()
 
 
@@ -61,7 +55,7 @@ async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
         class_=AsyncSession,
         expire_on_commit=False,
     )
-    
+
     async with session_factory() as session:
         yield session
         await session.rollback()
@@ -70,35 +64,35 @@ async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture(scope="function")
 async def client(test_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create a test client with database session override."""
-    
+
     async def override_get_db():
         yield test_session
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    
+
     transport = ASGITransport(app=app)
     async with AsyncClient(
-        transport=transport, 
+        transport=transport,
         base_url="http://test",
         follow_redirects=True,  # Handle FastAPI trailing slash redirects
     ) as client:
         yield client
-    
+
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
 def sync_client(test_session: AsyncSession) -> Generator[TestClient, None, None]:
     """Create a synchronous test client."""
-    
+
     async def override_get_db():
         yield test_session
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    
+
     with TestClient(app) as client:
         yield client
-    
+
     app.dependency_overrides.clear()
 
 

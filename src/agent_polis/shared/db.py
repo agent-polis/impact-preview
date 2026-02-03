@@ -2,7 +2,8 @@
 Database connection and session management using SQLAlchemy async.
 """
 
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
@@ -20,13 +21,13 @@ from agent_polis.config import settings
 class JSONType(TypeDecorator):
     """
     Cross-database JSON type that uses JSONB on PostgreSQL and JSON on SQLite.
-    
+
     This allows tests to run on SQLite while production uses PostgreSQL's
     more efficient JSONB type.
     """
     impl = JSON
     cache_ok = True
-    
+
     def load_dialect_impl(self, dialect: Any) -> Any:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(JSONB())
@@ -59,10 +60,10 @@ async def init_db() -> None:
     """Initialize database - create tables if they don't exist."""
     async with engine.begin() as conn:
         # Import all models to register them with Base
-        from agent_polis.events.models import Event  # noqa: F401
         from agent_polis.agents.db_models import Agent  # noqa: F401
+        from agent_polis.events.models import Event  # noqa: F401
         from agent_polis.simulations.db_models import Simulation  # noqa: F401
-        
+
         await conn.run_sync(Base.metadata.create_all)
 
 
@@ -74,7 +75,7 @@ async def close_db() -> None:
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency that provides a database session.
-    
+
     Usage:
         @app.get("/items")
         async def get_items(db: AsyncSession = Depends(get_db)):

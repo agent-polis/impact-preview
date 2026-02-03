@@ -2,7 +2,7 @@
 Simulation service - business logic for simulation management.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import structlog
@@ -14,6 +14,7 @@ from agent_polis.config import settings
 from agent_polis.events.bus import publish_event
 from agent_polis.events.store import EventStore
 from agent_polis.events.types import (
+    DomainEvent,
     OutcomeActualized,
     OutcomePredicted,
     SimulationCompleted,
@@ -31,19 +32,19 @@ from agent_polis.simulations.models import (
     SimulationResult,
     SimulationStatus,
 )
-from agent_polis.simulations.sandbox import SandboxExecutor, get_sandbox_executor
+from agent_polis.simulations.sandbox import get_sandbox_executor
 
 logger = structlog.get_logger()
 
 
 class SimulationService:
     """Service for simulation management operations."""
-    
+
     def __init__(self, session: AsyncSession):
         self.session = session
         self.event_store = EventStore(session)
         self.executor = get_sandbox_executor()
-    
+
     async def create(
         self,
         data: SimulationCreate,
@@ -51,7 +52,7 @@ class SimulationService:
     ) -> Simulation:
         """
         Create a new simulation.
-        
+
         Does not execute the simulation - use run() for that.
         """
         # Check rate limits
@@ -59,7 +60,7 @@ class SimulationService:
             raise ValueError(
                 f"Monthly simulation limit ({settings.free_tier_simulations_per_month}) exceeded"
             )
-        
+
         # Create simulation record
         simulation = Simulation(
             creator_id=creator.id,
@@ -68,10 +69,10 @@ class SimulationService:
             scenario_definition=data.scenario.model_dump(),
             callback_url=data.callback_url,
         )
-        
+
         self.session.add(simulation)
         await self.session.flush()
-        
+
         # Record event
         event = SimulationCreated(
             stream_id=f"simulation:{simulation.id}",
@@ -84,16 +85,16 @@ class SimulationService:
         )
         await self.event_store.append(event, actor_id=str(creator.id))
         await publish_event(event)
-        
+
         logger.info(
             "Simulation created",
             simulation_id=str(simulation.id),
             creator=creator.name,
             scenario=data.scenario.name,
         )
-        
+
         return simulation
-    
+
     async def run(
         self,
         simulation: Simulation,
@@ -102,17 +103,17 @@ class SimulationService:
     ) -> SimulationResult:
         """
         Execute a simulation in the sandbox.
-        
+
         This is the core functionality - running scenarios in isolation.
         """
         if simulation.status not in ["pending", "failed"]:
             raise ValueError(f"Simulation already {simulation.status}")
-        
+
         # Update status
         simulation.status = "running"
-        simulation.started_at = datetime.now(timezone.utc)
+        simulation.started_at = datetime.now(UTC)
         await self.session.flush()
-        
+
         # Record start event
         start_event = SimulationStarted(
             stream_id=f"simulation:{simulation.id}",
@@ -122,40 +123,41 @@ class SimulationService:
         )
         await self.event_store.append(start_event)
         await publish_event(start_event)
-        
+
         # Parse scenario
         scenario = ScenarioDefinition(**simulation.scenario_definition)
-        
+
         # Apply overrides
         timeout = timeout_override or scenario.timeout_seconds
         inputs = {**scenario.inputs}
         if input_overrides:
             inputs.update(input_overrides)
-        
+
         # Execute in sandbox
         try:
             if not scenario.code:
                 raise ValueError("No code provided in scenario")
-            
+
             result = await self.executor.execute(
                 code=scenario.code,
                 inputs=inputs,
                 environment=scenario.environment,
                 timeout_seconds=timeout,
             )
-            
+
             # Update simulation with result
             simulation.result = result.model_dump(mode='json')
             simulation.status = "completed" if result.success else "failed"
-            simulation.completed_at = datetime.now(timezone.utc)
-            
+            simulation.completed_at = datetime.now(UTC)
+
             # Increment agent's simulation count
             creator = await self.session.get(Agent, simulation.creator_id)
             if creator:
                 creator.increment_simulation_count()
                 creator.update_last_active()
-            
+
             # Record completion/failure event
+            event: DomainEvent
             if result.success:
                 event = SimulationCompleted(
                     stream_id=f"simulation:{simulation.id}",
@@ -173,10 +175,10 @@ class SimulationService:
                         "error": result.error,
                     },
                 )
-            
+
             await self.event_store.append(event)
             await publish_event(event)
-            
+
             # Record metering event
             meter_event = SimulationMetered(
                 stream_id=f"agent:{simulation.creator_id}",
@@ -189,29 +191,29 @@ class SimulationService:
             )
             await self.event_store.append(meter_event)
             await publish_event(meter_event)
-            
+
             logger.info(
                 "Simulation executed",
                 simulation_id=str(simulation.id),
                 success=result.success,
                 duration_ms=result.duration_ms,
             )
-            
+
             # Send webhook callback if configured
             if simulation.callback_url:
                 await self._send_callback(simulation, result)
-            
+
             return result
-            
+
         except Exception as e:
             # Handle execution errors
             simulation.status = "failed"
-            simulation.completed_at = datetime.now(timezone.utc)
+            simulation.completed_at = datetime.now(UTC)
             simulation.result = {
                 "success": False,
                 "error": str(e),
             }
-            
+
             event = SimulationFailed(
                 stream_id=f"simulation:{simulation.id}",
                 data={
@@ -221,16 +223,16 @@ class SimulationService:
             )
             await self.event_store.append(event)
             await publish_event(event)
-            
+
             logger.error(
                 "Simulation failed",
                 simulation_id=str(simulation.id),
                 error=str(e),
                 exc_info=e,
             )
-            
+
             raise
-    
+
     async def record_prediction(
         self,
         simulation: Simulation,
@@ -239,7 +241,7 @@ class SimulationService:
     ) -> None:
         """Record an outcome prediction for a simulation."""
         simulation.predicted_outcome = prediction.model_dump()
-        
+
         event = OutcomePredicted(
             stream_id=f"simulation:{simulation.id}",
             data={
@@ -251,14 +253,14 @@ class SimulationService:
         )
         await self.event_store.append(event, actor_id=str(predictor.id))
         await publish_event(event)
-        
+
         logger.info(
             "Prediction recorded",
             simulation_id=str(simulation.id),
             predictor=predictor.name,
             predicted_success=prediction.predicted_success,
         )
-    
+
     async def record_actual_outcome(
         self,
         simulation: Simulation,
@@ -267,7 +269,7 @@ class SimulationService:
     ) -> None:
         """Record the actual outcome after real-world execution."""
         simulation.actual_outcome = actual
-        
+
         event = OutcomeActualized(
             stream_id=f"simulation:{simulation.id}",
             data={
@@ -278,22 +280,22 @@ class SimulationService:
         )
         await self.event_store.append(event, actor_id=str(recorder.id))
         await publish_event(event)
-        
+
         # TODO: Compare prediction vs actual, update predictor reputation
-        
+
         logger.info(
             "Actual outcome recorded",
             simulation_id=str(simulation.id),
             recorder=recorder.name,
         )
-    
+
     async def get_by_id(self, simulation_id: UUID) -> Simulation | None:
         """Get a simulation by ID."""
         result = await self.session.execute(
             select(Simulation).where(Simulation.id == simulation_id)
         )
         return result.scalar_one_or_none()
-    
+
     async def list_by_creator(
         self,
         creator_id: UUID,
@@ -306,15 +308,15 @@ class SimulationService:
         count_query = select(func.count(Simulation.id)).where(
             Simulation.creator_id == creator_id
         )
-        
+
         if status:
             query = query.where(Simulation.status == status)
             count_query = count_query.where(Simulation.status == status)
-        
+
         # Get total
         total_result = await self.session.execute(count_query)
         total = total_result.scalar() or 0
-        
+
         # Get page
         query = (
             query
@@ -322,12 +324,12 @@ class SimulationService:
             .limit(page_size)
             .offset((page - 1) * page_size)
         )
-        
+
         result = await self.session.execute(query)
         simulations = result.scalars().all()
-        
+
         return list(simulations), total
-    
+
     async def _send_callback(
         self,
         simulation: Simulation,
@@ -335,19 +337,19 @@ class SimulationService:
     ) -> None:
         """Send webhook callback for completed simulation."""
         import httpx
-        
+
         if not simulation.callback_url:
             return
-        
+
         payload = {
             "event": "simulation.completed",
             "simulation_id": str(simulation.id),
             "status": simulation.status,
             "success": result.success,
             "result": result.model_dump(mode='json') if result else None,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
-        
+
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(
@@ -368,7 +370,7 @@ class SimulationService:
                 url=simulation.callback_url,
                 error=str(e),
             )
-    
+
     def to_response(self, simulation: Simulation) -> SimulationResponse:
         """Convert a Simulation to SimulationResponse."""
         return SimulationResponse(

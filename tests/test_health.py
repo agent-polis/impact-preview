@@ -10,7 +10,7 @@ from httpx import AsyncClient
 async def test_health_check(client: AsyncClient):
     """Test the health check endpoint."""
     response = await client.get("/health")
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
@@ -22,7 +22,7 @@ async def test_health_check(client: AsyncClient):
 async def test_agent_card(client: AsyncClient):
     """Test the A2A agent card endpoint."""
     response = await client.get("/.well-known/agent.json")
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Agent Polis"

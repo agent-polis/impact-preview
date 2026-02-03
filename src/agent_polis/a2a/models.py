@@ -5,10 +5,10 @@ These models follow the A2A protocol specification for task management
 and agent communication.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -63,8 +63,8 @@ class Task(BaseModel):
     id: str = Field(default_factory=lambda: uuid4().hex, description="Task ID")
     status: TaskStatus = Field(default=TaskStatus.SUBMITTED, description="Task status")
     messages: list[Message] = Field(default_factory=list, description="Conversation history")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     result: dict[str, Any] | None = Field(default=None, description="Task result if completed")
     error: str | None = Field(default=None, description="Error message if failed")
 
@@ -72,7 +72,7 @@ class Task(BaseModel):
 class AgentCard(BaseModel):
     """
     A2A Agent Card - describes this agent's capabilities.
-    
+
     This is returned by /.well-known/agent.json for agent discovery.
     """
     name: str = Field(description="Agent name")

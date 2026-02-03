@@ -4,9 +4,10 @@ Structured logging configuration using structlog.
 
 import logging
 import sys
-from typing import Literal
+from typing import Literal, cast
 
 import structlog
+from structlog.types import Processor
 
 
 def setup_logging(
@@ -15,7 +16,7 @@ def setup_logging(
 ) -> None:
     """
     Configure structured logging for the application.
-    
+
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         format_type: Output format (json or text)
@@ -28,7 +29,7 @@ def setup_logging(
     )
 
     # Configure structlog processors
-    shared_processors = [
+    shared_processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
@@ -40,7 +41,7 @@ def setup_logging(
 
     if format_type == "json":
         # JSON format for production
-        processors = shared_processors + [
+        processors: list[Processor] = shared_processors + [
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),
         ]
@@ -61,4 +62,4 @@ def setup_logging(
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     """Get a structured logger instance."""
-    return structlog.get_logger(name)
+    return cast(structlog.stdlib.BoundLogger, structlog.get_logger(name))

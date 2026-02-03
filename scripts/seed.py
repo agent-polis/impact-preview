@@ -13,22 +13,22 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from agent_polis.shared.db import async_session_factory, init_db
-from agent_polis.agents.service import AgentService
 from agent_polis.agents.models import AgentCreate
+from agent_polis.agents.service import AgentService
+from agent_polis.shared.db import async_session_factory, init_db
+from agent_polis.simulations.models import ScenarioDefinition, SimulationCreate
 from agent_polis.simulations.service import SimulationService
-from agent_polis.simulations.models import SimulationCreate, ScenarioDefinition
 
 
 async def seed_data():
     """Create development seed data."""
     print("Initializing database...")
     await init_db()
-    
+
     async with async_session_factory() as session:
         agent_service = AgentService(session)
         sim_service = SimulationService(session)
-        
+
         # Create demo agent
         print("Creating demo agent...")
         try:
@@ -47,11 +47,11 @@ async def seed_data():
             agent = await agent_service.get_by_name("demo-agent")
             if agent:
                 print(f"  Using existing agent: {agent.name}")
-        
+
         if agent:
             # Create sample simulations
             print("\nCreating sample simulations...")
-            
+
             scenarios = [
                 {
                     "name": "Hello World",
@@ -95,7 +95,7 @@ result = {
                     "inputs": {"items": [10, 20, 30, 40, 50]},
                 },
             ]
-            
+
             for scenario_data in scenarios:
                 try:
                     simulation = await sim_service.create(
@@ -107,9 +107,9 @@ result = {
                     print(f"  Created simulation: {scenario_data['name']} ({simulation.id})")
                 except Exception as e:
                     print(f"  Error creating {scenario_data['name']}: {e}")
-        
+
         await session.commit()
-    
+
     print("\nSeed complete!")
     print("\nTo run the server:")
     print("  uvicorn agent_polis.main:app --reload")

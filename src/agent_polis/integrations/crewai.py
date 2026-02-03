@@ -6,64 +6,83 @@ Agent Polis for simulation-based governance.
 
 Usage:
     from agent_polis.integrations.crewai import AgentPolisTool, SimulationCallback
-    
+
     # As a tool
     tool = AgentPolisTool(api_url="http://localhost:8000", api_key="ap_...")
-    
+
     # As a callback
     callback = SimulationCallback(api_url="http://localhost:8000", api_key="ap_...")
 """
 
-from typing import Any, Type
+
+from typing import Any, ClassVar, cast
 
 import httpx
+from pydantic import BaseModel, Field
 
 # Try to import CrewAI - it's optional
 try:
-    from crewai.tools import BaseTool
-    from pydantic import BaseModel, Field
+    from crewai.tools import BaseTool as CrewBaseTool  # type: ignore[import-not-found]
     CREWAI_AVAILABLE = True
 except ImportError:
     CREWAI_AVAILABLE = False
-    BaseTool = object
-    BaseModel = object
-    Field = lambda **kwargs: None
+    CrewBaseTool = None
+
+BaseTool: type[Any]
+if CrewBaseTool is None:
+    class _FallbackBaseTool:
+        """Fallback base tool when CrewAI isn't installed."""
+
+        def __init__(self, **kwargs: Any) -> None:
+            _ = kwargs
+
+    BaseTool = _FallbackBaseTool
+else:
+    BaseTool = CrewBaseTool
 
 
-class SimulationInput(BaseModel if CREWAI_AVAILABLE else object):
+JsonDict = dict[str, Any]
+
+
+class SimulationInput(BaseModel):
     """Input schema for simulation tool."""
-    
+
     name: str = Field(description="Name of the simulation scenario")
     description: str = Field(description="Description of what to simulate")
     code: str = Field(description="Python code to execute in sandbox")
-    inputs: dict = Field(default_factory=dict, description="Input variables for the code")
+    inputs: dict[str, Any] = Field(default_factory=dict, description="Input variables for the code")
     timeout_seconds: int = Field(default=60, description="Execution timeout")
 
 
-class AgentPolisTool(BaseTool if CREWAI_AVAILABLE else object):
+class AgentPolisTool(BaseTool):
     """
     CrewAI tool for running simulations via Agent Polis.
-    
+
     This allows agents to test scenarios in a sandbox before committing.
     Use this for decision-making, risk assessment, and plan validation.
     """
-    
+
     name: str = "agent_polis_simulate"
     description: str = (
         "Run a simulation in Agent Polis to test a scenario before committing to it. "
         "Useful for validating plans, testing code changes, or assessing risks. "
         "The simulation runs in an isolated sandbox environment."
     )
-    args_schema: Type[BaseModel] = SimulationInput if CREWAI_AVAILABLE else None
-    
+    args_schema: ClassVar[type[BaseModel] | None] = SimulationInput if CREWAI_AVAILABLE else None
+
     api_url: str = "http://localhost:8000"
     api_key: str = ""
     timeout: int = 120
-    
-    def __init__(self, api_url: str = "http://localhost:8000", api_key: str = "", **kwargs):
+
+    def __init__(
+        self,
+        api_url: str = "http://localhost:8000",
+        api_key: str = "",
+        **kwargs: Any,
+    ) -> None:
         """
         Initialize the Agent Polis tool.
-        
+
         Args:
             api_url: Base URL of the Agent Polis API
             api_key: API key for authentication
@@ -72,18 +91,18 @@ class AgentPolisTool(BaseTool if CREWAI_AVAILABLE else object):
             super().__init__(**kwargs)
         self.api_url = api_url
         self.api_key = api_key
-    
+
     def _run(
         self,
         name: str,
         description: str,
         code: str,
-        inputs: dict | None = None,
+        inputs: dict[str, Any] | None = None,
         timeout_seconds: int = 60,
     ) -> str:
         """
         Run a simulation synchronously.
-        
+
         Returns a summary of the simulation result.
         """
         try:
@@ -91,7 +110,7 @@ class AgentPolisTool(BaseTool if CREWAI_AVAILABLE else object):
                 "Content-Type": "application/json",
                 "X-API-Key": self.api_key,
             }
-            
+
             # Create simulation
             create_response = httpx.post(
                 f"{self.api_url}/api/v1/simulations",
@@ -107,13 +126,13 @@ class AgentPolisTool(BaseTool if CREWAI_AVAILABLE else object):
                 },
                 timeout=self.timeout,
             )
-            
+
             if create_response.status_code != 201:
                 return f"Failed to create simulation: {create_response.text}"
-            
-            sim_data = create_response.json()
+
+            sim_data = cast(dict[str, Any], create_response.json())
             sim_id = sim_data["id"]
-            
+
             # Run simulation
             run_response = httpx.post(
                 f"{self.api_url}/api/v1/simulations/{sim_id}/run",
@@ -121,12 +140,12 @@ class AgentPolisTool(BaseTool if CREWAI_AVAILABLE else object):
                 json={},
                 timeout=timeout_seconds + 30,
             )
-            
+
             if run_response.status_code != 200:
                 return f"Failed to run simulation: {run_response.text}"
-            
-            result = run_response.json()
-            
+
+            result = cast(dict[str, Any], run_response.json())
+
             # Format result
             if result.get("success"):
                 output_str = str(result.get("output", "No output"))
@@ -143,7 +162,7 @@ class AgentPolisTool(BaseTool if CREWAI_AVAILABLE else object):
                     f"Error: {result.get('error', 'Unknown error')}\n"
                     f"Stderr: {result.get('stderr', 'None')[:500]}"
                 )
-                
+
         except httpx.TimeoutException:
             return f"Simulation timed out after {self.timeout} seconds"
         except Exception as e:
@@ -153,14 +172,14 @@ class AgentPolisTool(BaseTool if CREWAI_AVAILABLE else object):
 class AgentPolisClient:
     """
     Standalone client for Agent Polis API.
-    
+
     Use this when you need more control than the CrewAI tool provides.
     """
-    
-    def __init__(self, api_url: str = "http://localhost:8000", api_key: str = ""):
+
+    def __init__(self, api_url: str = "http://localhost:8000", api_key: str = "") -> None:
         """
         Initialize the client.
-        
+
         Args:
             api_url: Base URL of the Agent Polis API
             api_key: API key for authentication
@@ -175,33 +194,33 @@ class AgentPolisClient:
             },
             timeout=120,
         )
-    
-    def health_check(self) -> dict:
+
+    def health_check(self) -> JsonDict:
         """Check API health."""
         response = self._client.get("/health")
         response.raise_for_status()
-        return response.json()
-    
-    def get_agent_card(self) -> dict:
+        return cast(JsonDict, response.json())
+
+    def get_agent_card(self) -> JsonDict:
         """Get the A2A agent card."""
         response = self._client.get("/.well-known/agent.json")
         response.raise_for_status()
-        return response.json()
-    
-    def get_me(self) -> dict:
+        return cast(JsonDict, response.json())
+
+    def get_me(self) -> JsonDict:
         """Get current agent profile."""
         response = self._client.get("/api/v1/agents/me")
         response.raise_for_status()
-        return response.json()
-    
+        return cast(JsonDict, response.json())
+
     def create_simulation(
         self,
         name: str,
         code: str,
         description: str | None = None,
-        inputs: dict | None = None,
+        inputs: dict[str, Any] | None = None,
         timeout_seconds: int = 60,
-    ) -> dict:
+    ) -> JsonDict:
         """Create a new simulation."""
         response = self._client.post(
             "/api/v1/simulations",
@@ -216,57 +235,57 @@ class AgentPolisClient:
             },
         )
         response.raise_for_status()
-        return response.json()
-    
+        return cast(JsonDict, response.json())
+
     def run_simulation(
         self,
         simulation_id: str,
         timeout_override: int | None = None,
-        input_overrides: dict | None = None,
-    ) -> dict:
+        input_overrides: dict[str, Any] | None = None,
+    ) -> JsonDict:
         """Run a simulation."""
-        body = {}
+        body: dict[str, Any] = {}
         if timeout_override:
             body["timeout_override"] = timeout_override
         if input_overrides:
             body["input_overrides"] = input_overrides
-        
+
         response = self._client.post(
             f"/api/v1/simulations/{simulation_id}/run",
             json=body,
         )
         response.raise_for_status()
-        return response.json()
-    
-    def get_simulation(self, simulation_id: str) -> dict:
+        return cast(JsonDict, response.json())
+
+    def get_simulation(self, simulation_id: str) -> JsonDict:
         """Get simulation details."""
         response = self._client.get(f"/api/v1/simulations/{simulation_id}")
         response.raise_for_status()
-        return response.json()
-    
+        return cast(JsonDict, response.json())
+
     def list_simulations(
         self,
         page: int = 1,
         page_size: int = 20,
         status: str | None = None,
-    ) -> dict:
+    ) -> JsonDict:
         """List simulations."""
-        params = {"page": page, "page_size": page_size}
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
         if status:
             params["status"] = status
-        
+
         response = self._client.get("/api/v1/simulations", params=params)
         response.raise_for_status()
-        return response.json()
-    
+        return cast(JsonDict, response.json())
+
     def simulate_and_run(
         self,
         name: str,
         code: str,
         description: str | None = None,
-        inputs: dict | None = None,
+        inputs: dict[str, Any] | None = None,
         timeout_seconds: int = 60,
-    ) -> dict:
+    ) -> JsonDict:
         """Create and immediately run a simulation."""
         sim = self.create_simulation(
             name=name,
@@ -276,29 +295,34 @@ class AgentPolisClient:
             timeout_seconds=timeout_seconds,
         )
         return self.run_simulation(sim["id"])
-    
-    def close(self):
+
+    def close(self) -> None:
         """Close the client."""
         self._client.close()
-    
-    def __enter__(self):
+
+    def __enter__(self) -> "AgentPolisClient":
         return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object | None,
+    ) -> None:
         self.close()
 
 
 def create_crewai_tool(api_url: str, api_key: str) -> "AgentPolisTool":
     """
     Factory function to create an Agent Polis tool for CrewAI.
-    
+
     Args:
         api_url: Base URL of the Agent Polis API
         api_key: API key for authentication
-        
+
     Returns:
         Configured AgentPolisTool instance
-        
+
     Raises:
         ImportError: If CrewAI is not installed
     """
@@ -306,5 +330,5 @@ def create_crewai_tool(api_url: str, api_key: str) -> "AgentPolisTool":
         raise ImportError(
             "CrewAI is not installed. Install it with: pip install impact-preview[crewai]"
         )
-    
+
     return AgentPolisTool(api_url=api_url, api_key=api_key)

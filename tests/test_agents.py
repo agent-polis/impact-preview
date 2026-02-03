@@ -16,7 +16,7 @@ async def test_register_agent(client: AsyncClient):
             "description": "A test agent",
         },
     )
-    
+
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "test-agent"
@@ -38,7 +38,7 @@ async def test_register_duplicate_name(client: AsyncClient):
         },
     )
     assert response1.status_code == 201
-    
+
     # Second registration with same name
     response2 = await client.post(
         "/api/v1/agents/register",
@@ -71,7 +71,7 @@ async def test_get_current_agent(client: AsyncClient, registered_agent: dict, au
         "/api/v1/agents/me",
         headers=auth_headers,
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == registered_agent["name"]
@@ -85,7 +85,7 @@ async def test_get_agent_stats(client: AsyncClient, auth_headers: dict):
         "/api/v1/agents/me/stats",
         headers=auth_headers,
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["total_simulations"] == 0

@@ -8,25 +8,25 @@ This module handles:
 - Executing approved actions
 """
 
+from agent_polis.actions.analyzer import ImpactAnalyzer, get_analyzer
+from agent_polis.actions.diff import (
+    format_diff_plain,
+    format_diff_summary,
+    format_diff_terminal,
+    generate_file_change,
+    generate_unified_diff,
+)
 from agent_polis.actions.models import (
+    ActionPreview,
+    ActionRequest,
+    ActionResponse,
     ActionType,
     ApprovalStatus,
-    ActionRequest,
-    ActionPreview,
     FileChange,
-    ActionResponse,
     RiskLevel,
 )
 from agent_polis.actions.router import router
 from agent_polis.actions.service import ActionService
-from agent_polis.actions.analyzer import ImpactAnalyzer, get_analyzer
-from agent_polis.actions.diff import (
-    generate_unified_diff,
-    generate_file_change,
-    format_diff_terminal,
-    format_diff_plain,
-    format_diff_summary,
-)
 
 __all__ = [
     # Models

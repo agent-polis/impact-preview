@@ -37,14 +37,14 @@ class Settings(BaseSettings):
 
     # Database
     database_url: PostgresDsn = Field(
-        default="postgresql+asyncpg://postgres:postgres@localhost:5432/agent_polis",
+        default=PostgresDsn("postgresql+asyncpg://postgres:postgres@localhost:5432/agent_polis"),
         description="PostgreSQL connection URL",
     )
     database_echo: bool = Field(default=False, description="Echo SQL queries")
 
     # Redis
     redis_url: RedisDsn = Field(
-        default="redis://localhost:6379/0", description="Redis connection URL"
+        default=RedisDsn("redis://localhost:6379/0"), description="Redis connection URL"
     )
 
     # E2B Sandbox

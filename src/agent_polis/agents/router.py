@@ -3,7 +3,6 @@ Agent management API routes.
 """
 
 from typing import Annotated
-from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -33,20 +32,20 @@ async def register_agent(
 ) -> AgentResponse:
     """
     Register a new agent with the polis.
-    
+
     Returns an API key that must be saved - it won't be shown again.
     Use this API key in the X-API-Key header for authenticated requests.
     """
     service = AgentService(db)
-    
+
     try:
         agent, api_key = await service.register(data)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
-    
+        ) from e
+
     return AgentResponse(
         id=agent.id,
         name=agent.name,
@@ -89,9 +88,9 @@ async def update_current_agent(
     """Update the current agent's profile."""
     if data.description is not None:
         agent.description = data.description
-    
+
     await db.flush()
-    
+
     service = AgentService(db)
     return await service.get_profile(agent)
 
@@ -103,19 +102,19 @@ async def regenerate_api_key(
 ) -> dict:
     """
     Regenerate the current agent's API key.
-    
+
     The old key will be immediately invalidated.
     Returns the new API key - save it, it won't be shown again!
     """
     from agent_polis.shared.security import generate_api_key, hash_api_key
-    
+
     new_api_key = generate_api_key()
     agent.api_key_hash = hash_api_key(new_api_key)
-    
+
     await db.flush()
-    
+
     logger.info("API key regenerated", agent_id=str(agent.id), agent_name=agent.name)
-    
+
     return {
         "message": "API key regenerated successfully",
         "api_key": new_api_key,
@@ -130,15 +129,15 @@ async def deactivate_agent(
 ) -> dict:
     """
     Deactivate the current agent's account.
-    
+
     This sets the agent status to 'inactive'. The agent can be reactivated
     by contacting support.
     """
     agent.status = "inactive"
     await db.flush()
-    
+
     logger.info("Agent deactivated", agent_id=str(agent.id), agent_name=agent.name)
-    
+
     return {
         "message": "Agent deactivated successfully",
         "status": "inactive",
@@ -153,13 +152,13 @@ async def get_agent_by_name(
     """Get a public agent profile by name."""
     service = AgentService(db)
     agent = await service.get_by_name(name)
-    
+
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent '{name}' not found",
         )
-    
+
     return await service.get_profile(agent)
 
 
@@ -177,7 +176,7 @@ async def list_agents(
         page_size=page_size,
         status=status_filter,
     )
-    
+
     return AgentListResponse(
         agents=profiles,
         total=total,

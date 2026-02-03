@@ -5,8 +5,7 @@ The event store is append-only - events cannot be modified or deleted.
 This provides an immutable audit trail of all system activity.
 """
 
-from typing import Sequence
-from uuid import UUID
+from collections.abc import Sequence
 
 import structlog
 from sqlalchemy import func, select
@@ -21,16 +20,16 @@ logger = structlog.get_logger()
 class EventStore:
     """
     Event store for persisting and retrieving domain events.
-    
+
     The store ensures:
     - Append-only semantics (no updates or deletes)
     - Optimistic concurrency via stream versioning
     - Tamper detection via hash chaining
     """
-    
+
     def __init__(self, session: AsyncSession):
         self.session = session
-    
+
     async def append(
         self,
         event: DomainEvent,
@@ -39,15 +38,15 @@ class EventStore:
     ) -> Event:
         """
         Append an event to the store.
-        
+
         Args:
             event: Domain event to append
             actor_id: Optional ID of the agent/user who caused this event
             correlation_id: Optional ID for correlating related events
-            
+
         Returns:
             The persisted Event record
-            
+
         Raises:
             IntegrityError: If stream version conflict (optimistic concurrency)
         """
@@ -59,14 +58,14 @@ class EventStore:
             .limit(1)
         )
         row = result.first()
-        
+
         if row:
             next_version = row.stream_version + 1
             prev_hash = row.hash
         else:
             next_version = 1
             prev_hash = None
-        
+
         # Build metadata
         metadata = {
             **event.metadata,
@@ -77,7 +76,7 @@ class EventStore:
             metadata["actor_id"] = actor_id
         if correlation_id:
             metadata["correlation_id"] = correlation_id
-        
+
         # Create and persist the event record
         db_event = Event.create(
             stream_id=event.stream_id,
@@ -87,19 +86,19 @@ class EventStore:
             metadata=metadata,
             prev_hash=prev_hash,
         )
-        
+
         self.session.add(db_event)
         await self.session.flush()
-        
+
         logger.info(
             "Event appended",
             event_type=event.event_type,
             stream_id=event.stream_id,
             version=next_version,
         )
-        
+
         return db_event
-    
+
     async def get_stream(
         self,
         stream_id: str,
@@ -107,11 +106,11 @@ class EventStore:
     ) -> Sequence[Event]:
         """
         Get all events for a stream, optionally from a specific version.
-        
+
         Args:
             stream_id: Stream identifier
             from_version: Start from this version (exclusive)
-            
+
         Returns:
             List of events in version order
         """
@@ -122,7 +121,7 @@ class EventStore:
             .order_by(Event.stream_version)
         )
         return result.scalars().all()
-    
+
     async def get_by_type(
         self,
         event_type: str,
@@ -131,12 +130,12 @@ class EventStore:
     ) -> Sequence[Event]:
         """
         Get events by type across all streams.
-        
+
         Args:
             event_type: Event type to filter by
             limit: Maximum events to return
             offset: Pagination offset
-            
+
         Returns:
             List of matching events
         """
@@ -148,7 +147,7 @@ class EventStore:
             .offset(offset)
         )
         return result.scalars().all()
-    
+
     async def get_recent(
         self,
         limit: int = 50,
@@ -160,15 +159,15 @@ class EventStore:
             .limit(limit)
         )
         return result.scalars().all()
-    
+
     async def verify_stream_integrity(self, stream_id: str) -> bool:
         """
         Verify hash chain integrity for a stream.
-        
+
         Returns True if all hashes are valid, False if tampering detected.
         """
         events = await self.get_stream(stream_id)
-        
+
         prev_hash = None
         for event in events:
             # Check prev_hash chain
@@ -181,7 +180,7 @@ class EventStore:
                     actual_prev=event.prev_hash,
                 )
                 return False
-            
+
             # Verify event hash
             if not event.verify_hash():
                 logger.error(
@@ -190,11 +189,11 @@ class EventStore:
                     version=event.stream_version,
                 )
                 return False
-            
+
             prev_hash = event.hash
-        
+
         return True
-    
+
     async def count_by_type(self, event_type: str) -> int:
         """Count events of a specific type."""
         result = await self.session.execute(

@@ -5,11 +5,11 @@ See exactly what will change before any AI agent action executes.
 Like "terraform plan" for autonomous AI agents.
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __author__ = "Agent Polis Contributors"
 
 from agent_polis.main import app
-from agent_polis.sdk import AgentPolisClient, ActionRejectedError, ActionTimedOutError
+from agent_polis.sdk import ActionRejectedError, ActionTimedOutError, AgentPolisClient
 
 __all__ = [
     "app",

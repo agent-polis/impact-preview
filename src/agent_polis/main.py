@@ -8,19 +8,30 @@ This module creates and configures the FastAPI application with all routers,
 middleware, and event handlers.
 """
 
-import sys
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from agent_polis.actions.router import router as actions_router
+from agent_polis.agents.router import router as agents_router
 from agent_polis.config import settings
-from agent_polis.shared.db import init_db, close_db
+from agent_polis.shared.db import close_db, init_db
 from agent_polis.shared.logging import setup_logging
+from agent_polis.shared.middleware import RateLimitMiddleware, RequestLoggingMiddleware
 from agent_polis.shared.redis import close_redis
+
+a2a_router: APIRouter | None
+simulations_router: APIRouter | None
+try:
+    from agent_polis.a2a.router import router as a2a_router
+    from agent_polis.simulations.router import router as simulations_router
+except ImportError:
+    a2a_router = None
+    simulations_router = None
 
 # Set up structured logging
 setup_logging(settings.log_level, settings.log_format)
@@ -31,12 +42,12 @@ logger = structlog.get_logger()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler for startup and shutdown events."""
     # Startup
-    logger.info("Starting Agent Polis", version="0.2.0", env=settings.app_env)
+    logger.info("Starting Agent Polis", version="0.2.2", env=settings.app_env)
     await init_db()
     logger.info("Database initialized")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Agent Polis")
     await close_db()
@@ -51,7 +62,7 @@ app = FastAPI(
         "Impact preview for AI agents - see exactly what will change before "
         "any autonomous agent action executes. Like 'terraform plan' for AI agents."
     ),
-    version="0.2.0",
+    version="0.2.2",
     docs_url="/docs" if settings.is_development else None,
     redoc_url="/redoc" if settings.is_development else None,
     lifespan=lifespan,
@@ -65,9 +76,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Add rate limiting and logging middleware
-from agent_polis.shared.middleware import RateLimitMiddleware, RequestLoggingMiddleware
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
@@ -96,7 +104,7 @@ async def health_check() -> dict:
     """Health check endpoint for container orchestration."""
     return {
         "status": "healthy",
-        "version": "0.2.0",
+        "version": "0.2.2",
         "environment": settings.app_env,
     }
 
@@ -106,7 +114,7 @@ async def health_check() -> dict:
 async def agent_card() -> dict:
     """
     A2A Agent Card - describes this agent's capabilities.
-    
+
     This endpoint is required for A2A protocol discovery.
     Other agents use this to understand what Agent Polis can do.
     """
@@ -116,7 +124,7 @@ async def agent_card() -> dict:
             "Impact preview for AI agents. Submit proposed actions, "
             "see exactly what will change, get human approval before execution."
         ),
-        "version": "0.2.0",
+        "version": "0.2.2",
         "protocol": "a2a/1.0",
         "capabilities": [
             "impact_preview",
@@ -135,28 +143,21 @@ async def agent_card() -> dict:
     }
 
 
-# Import and include routers
-from agent_polis.agents.router import router as agents_router
-from agent_polis.actions.router import router as actions_router
-
 # Core API routes
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["Agents"])
 app.include_router(actions_router, prefix="/api/v1/actions", tags=["Actions"])
 
 # Legacy routes (v0.1 compatibility - can be removed in future)
-try:
-    from agent_polis.a2a.router import router as a2a_router
-    from agent_polis.simulations.router import router as simulations_router
+if a2a_router:
     app.include_router(a2a_router, prefix="/a2a", tags=["Legacy - A2A"])
+if simulations_router:
     app.include_router(simulations_router, prefix="/api/v1/simulations", tags=["Legacy - Simulations"])
-except ImportError:
-    pass  # Legacy modules may be removed
 
 
 def cli() -> None:
     """Command-line interface entry point."""
     import uvicorn
-    
+
     uvicorn.run(
         "agent_polis.main:app",
         host=settings.host,

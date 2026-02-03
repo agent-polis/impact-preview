@@ -5,7 +5,7 @@ All events in the system inherit from DomainEvent and are immutable records
 of something that happened.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -15,15 +15,15 @@ from pydantic import BaseModel, Field
 class DomainEvent(BaseModel):
     """
     Base class for all domain events.
-    
+
     Events are immutable records of things that happened. They form the
     append-only audit trail that is the source of truth for system state.
     """
-    
+
     event_id: UUID = Field(default_factory=uuid4, description="Unique event identifier")
     event_type: str = Field(description="Event type name (e.g., 'AgentRegistered')")
     stream_id: str = Field(description="Aggregate/stream identifier (e.g., 'agent:abc123')")
-    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When event occurred")
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="When event occurred")
     data: dict[str, Any] = Field(default_factory=dict, description="Event payload")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Event metadata (actor, correlation, etc.)")
 

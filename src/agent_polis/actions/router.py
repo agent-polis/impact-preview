@@ -21,7 +21,6 @@ from agent_polis.actions.models import (
     ActionRequest,
     ActionResponse,
     ApprovalRequest,
-    ApprovalStatus,
     RejectionRequest,
 )
 from agent_polis.actions.service import ActionService
@@ -40,21 +39,21 @@ async def submit_action(
 ) -> ActionResponse:
     """
     Submit a proposed action for approval.
-    
+
     The action will be analyzed and a preview will be generated showing
     exactly what will change. The action remains pending until approved.
-    
+
     If `auto_approve_if_low_risk` is True and the action is assessed as
     low risk, it will be automatically approved.
     """
     service = ActionService(db)
-    
+
     action, preview = await service.submit(request, agent)
     response = service.to_response(action)
-    
+
     # Attach agent name for response
     response.agent_name = agent.name
-    
+
     return response
 
 
@@ -68,17 +67,17 @@ async def list_actions(
 ) -> ActionListResponse:
     """List actions submitted by the current agent."""
     service = ActionService(db)
-    
+
     actions, total = await service.list_by_agent(
         agent_id=agent.id,
         status=status_filter,
         page=page,
         page_size=page_size,
     )
-    
+
     # Get pending count
     _, _, pending_count = await service.list_pending(agent_id=agent.id)
-    
+
     return ActionListResponse(
         actions=[service.to_response(a) for a in actions],
         total=total,
@@ -98,19 +97,19 @@ async def list_pending_actions(
 ) -> ActionListResponse:
     """
     List pending actions awaiting approval.
-    
+
     By default, shows only the current agent's pending actions.
     Set `all_agents=true` to see all pending actions (for reviewers).
     """
     service = ActionService(db)
-    
+
     agent_id = None if all_agents else agent.id
     actions, total, pending_count = await service.list_pending(
         agent_id=agent_id,
         page=page,
         page_size=page_size,
     )
-    
+
     return ActionListResponse(
         actions=[service.to_response(a) for a in actions],
         total=total,
@@ -129,13 +128,13 @@ async def get_action(
     """Get details of a specific action."""
     service = ActionService(db)
     action = await service.get_by_id(action_id)
-    
+
     if not action:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Action not found",
         )
-    
+
     return service.to_response(action)
 
 
@@ -147,24 +146,24 @@ async def get_action_preview(
 ) -> dict:
     """
     Get the impact preview for an action.
-    
+
     Returns the full preview with file changes, risk assessment, and warnings.
     """
     service = ActionService(db)
     action = await service.get_by_id(action_id)
-    
+
     if not action:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Action not found",
         )
-    
+
     if not action.preview:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Preview not yet generated",
         )
-    
+
     return action.preview
 
 
@@ -177,7 +176,7 @@ async def get_action_diff(
 ) -> dict:
     """
     Get the diff for file changes in an action.
-    
+
     Formats:
     - `plain`: Simple text diff
     - `terminal`: ANSI-colored for terminal display
@@ -185,23 +184,23 @@ async def get_action_diff(
     """
     service = ActionService(db)
     action = await service.get_by_id(action_id)
-    
+
     if not action:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Action not found",
         )
-    
+
     if not action.preview:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Preview not yet generated",
         )
-    
-    from agent_polis.actions.models import ActionPreview, FileChange
-    
+
+    from agent_polis.actions.models import ActionPreview
+
     preview = ActionPreview(**action.preview)
-    
+
     if format == "json":
         return {
             "action_id": str(action_id),
@@ -229,18 +228,18 @@ async def approve_action(
 ) -> ActionResponse:
     """
     Approve a pending action.
-    
+
     Once approved, the action can be executed.
     """
     service = ActionService(db)
     action = await service.get_by_id(action_id)
-    
+
     if not action:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Action not found",
         )
-    
+
     try:
         comment = request.comment if request else None
         action = await service.approve(action, agent, comment=comment)
@@ -248,8 +247,8 @@ async def approve_action(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
-    
+        ) from e
+
     return service.to_response(action)
 
 
@@ -262,26 +261,26 @@ async def reject_action(
 ) -> ActionResponse:
     """
     Reject a pending action.
-    
+
     A reason must be provided to help the agent understand why.
     """
     service = ActionService(db)
     action = await service.get_by_id(action_id)
-    
+
     if not action:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Action not found",
         )
-    
+
     try:
         action = await service.reject(action, agent, request.reason)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
-    
+        ) from e
+
     return service.to_response(action)
 
 
@@ -293,28 +292,28 @@ async def execute_action(
 ) -> ActionResponse:
     """
     Execute an approved action.
-    
+
     The action must be approved before it can be executed.
     This endpoint marks the action as executed - the actual operation
     is performed by the agent after receiving confirmation.
     """
     service = ActionService(db)
     action = await service.get_by_id(action_id)
-    
+
     if not action:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Action not found",
         )
-    
+
     try:
         action = await service.execute(action, agent)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
-    
+        ) from e
+
     return service.to_response(action)
 
 
@@ -326,24 +325,24 @@ async def get_action_events(
 ) -> list[dict]:
     """
     Get the event history for an action.
-    
+
     Returns a complete audit trail of everything that happened
     with this action - useful for compliance and debugging.
     """
     from agent_polis.events.store import EventStore
-    
+
     service = ActionService(db)
     action = await service.get_by_id(action_id)
-    
+
     if not action:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Action not found",
         )
-    
+
     event_store = EventStore(db)
     events = await event_store.get_stream(f"action:{action_id}")
-    
+
     return [
         {
             "id": str(e.id),

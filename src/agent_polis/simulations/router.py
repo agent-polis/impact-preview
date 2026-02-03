@@ -18,8 +18,8 @@ from agent_polis.simulations.models import (
     SimulationCreate,
     SimulationListResponse,
     SimulationResponse,
-    SimulationRunRequest,
     SimulationResult,
+    SimulationRunRequest,
 )
 from agent_polis.simulations.service import SimulationService
 
@@ -35,20 +35,20 @@ async def create_simulation(
 ) -> SimulationResponse:
     """
     Create a new simulation scenario.
-    
+
     This creates the simulation but does not execute it.
     Use POST /simulations/{id}/run to execute.
     """
     service = SimulationService(db)
-    
+
     try:
         simulation = await service.create(data, agent)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
-    
+        ) from e
+
     return service.to_response(simulation)
 
 
@@ -68,7 +68,7 @@ async def list_simulations(
         page_size=page_size,
         status=status_filter,
     )
-    
+
     return SimulationListResponse(
         simulations=[service.to_response(s) for s in simulations],
         total=total,
@@ -86,20 +86,20 @@ async def get_simulation(
     """Get a simulation by ID."""
     service = SimulationService(db)
     simulation = await service.get_by_id(simulation_id)
-    
+
     if not simulation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Simulation not found",
         )
-    
+
     # Check ownership (or make public later)
     if simulation.creator_id != agent.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this simulation",
         )
-    
+
     return service.to_response(simulation)
 
 
@@ -112,25 +112,25 @@ async def run_simulation(
 ) -> SimulationResult:
     """
     Execute a simulation in the sandbox.
-    
+
     This is the core functionality - run your scenario in isolation
     before committing to it in the real world.
     """
     service = SimulationService(db)
     simulation = await service.get_by_id(simulation_id)
-    
+
     if not simulation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Simulation not found",
         )
-    
+
     if simulation.creator_id != agent.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to run this simulation",
         )
-    
+
     try:
         result = await service.run(
             simulation,
@@ -142,7 +142,7 @@ async def run_simulation(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
 
 
 @router.get("/{simulation_id}/results", response_model=SimulationResult | None)
@@ -154,22 +154,22 @@ async def get_simulation_results(
     """Get the results of a completed simulation."""
     service = SimulationService(db)
     simulation = await service.get_by_id(simulation_id)
-    
+
     if not simulation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Simulation not found",
         )
-    
+
     if simulation.creator_id != agent.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this simulation",
         )
-    
+
     if not simulation.result:
         return None
-    
+
     return SimulationResult(**simulation.result)
 
 
@@ -182,21 +182,21 @@ async def record_prediction(
 ) -> dict:
     """
     Record a prediction about the simulation outcome.
-    
+
     Predictions can be compared against actual outcomes later
     to track prediction accuracy and update reputation.
     """
     service = SimulationService(db)
     simulation = await service.get_by_id(simulation_id)
-    
+
     if not simulation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Simulation not found",
         )
-    
+
     await service.record_prediction(simulation, prediction, agent)
-    
+
     return {"status": "prediction_recorded", "simulation_id": str(simulation_id)}
 
 
@@ -209,27 +209,27 @@ async def record_actual_outcome(
 ) -> dict:
     """
     Record the actual outcome after real-world execution.
-    
+
     This allows comparing simulated predictions with reality,
     which is essential for calibrating the governance system.
     """
     service = SimulationService(db)
     simulation = await service.get_by_id(simulation_id)
-    
+
     if not simulation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Simulation not found",
         )
-    
+
     if simulation.creator_id != agent.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update this simulation",
         )
-    
+
     await service.record_actual_outcome(simulation, actual, agent)
-    
+
     return {"status": "outcome_recorded", "simulation_id": str(simulation_id)}
 
 
@@ -241,30 +241,30 @@ async def get_simulation_events(
 ) -> list[dict]:
     """
     Get the event history for a simulation.
-    
+
     This provides a complete audit trail of everything that happened
     with this simulation - useful for compliance and debugging.
     """
     from agent_polis.events.store import EventStore
-    
+
     service = SimulationService(db)
     simulation = await service.get_by_id(simulation_id)
-    
+
     if not simulation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Simulation not found",
         )
-    
+
     if simulation.creator_id != agent.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this simulation",
         )
-    
+
     event_store = EventStore(db)
     events = await event_store.get_stream(f"simulation:{simulation_id}")
-    
+
     return [
         {
             "id": str(e.id),

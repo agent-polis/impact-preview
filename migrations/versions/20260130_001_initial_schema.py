@@ -1,21 +1,21 @@
 """Initial schema
 
 Revision ID: 001
-Revises: 
+Revises:
 Create Date: 2026-01-30
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '001'
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -37,7 +37,7 @@ def upgrade() -> None:
     op.create_index('idx_events_stream_version', 'events', ['stream_id', 'stream_version'])
     op.create_index('idx_events_type', 'events', ['event_type'])
     op.create_index('idx_events_created_at', 'events', ['created_at'])
-    
+
     # Trigger to prevent event modification
     op.execute("""
         CREATE OR REPLACE FUNCTION prevent_event_modification()
@@ -47,13 +47,13 @@ def upgrade() -> None:
         END;
         $$ LANGUAGE plpgsql;
     """)
-    
+
     op.execute("""
         CREATE TRIGGER events_immutable
         BEFORE UPDATE OR DELETE ON events
         FOR EACH ROW EXECUTE FUNCTION prevent_event_modification();
     """)
-    
+
     # Agents table
     op.create_table(
         'agents',
@@ -74,7 +74,7 @@ def upgrade() -> None:
     op.create_index('ix_agents_name', 'agents', ['name'], unique=True)
     op.create_index('ix_agents_api_key_hash', 'agents', ['api_key_hash'], unique=True)
     op.create_index('ix_agents_status', 'agents', ['status'])
-    
+
     # Simulations table
     op.create_table(
         'simulations',
@@ -102,8 +102,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table('simulations')
     op.drop_table('agents')
-    
+
     op.execute("DROP TRIGGER IF EXISTS events_immutable ON events")
     op.execute("DROP FUNCTION IF EXISTS prevent_event_modification()")
-    
+
     op.drop_table('events')

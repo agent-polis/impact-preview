@@ -10,17 +10,17 @@ from httpx import AsyncClient
 async def test_a2a_agent_card_structure(client: AsyncClient):
     """Test that agent card has required A2A fields."""
     response = await client.get("/.well-known/agent.json")
-    
+
     assert response.status_code == 200
     card = response.json()
-    
+
     # Required A2A fields
     assert "name" in card
     assert "description" in card
     assert "version" in card
     assert "protocol" in card
     assert "capabilities" in card
-    
+
     # Check protocol version format
     assert card["protocol"].startswith("a2a/")
 
@@ -41,14 +41,14 @@ async def test_a2a_task_send(client: AsyncClient):
             },
         },
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # JSON-RPC response structure
     assert data["id"] == "test-request-1"
     assert "result" in data or "error" in data
-    
+
     if "result" in data:
         result = data["result"]
         assert "task" in result
@@ -73,13 +73,13 @@ async def test_a2a_task_status(client: AsyncClient):
             },
         },
     )
-    
+
     assert create_response.status_code == 200
     task_id = create_response.json()["result"]["task"]["id"]
-    
+
     # Get task status
     status_response = await client.get(f"/a2a/tasks/{task_id}")
-    
+
     assert status_response.status_code == 200
     task = status_response.json()
     assert task["id"] == task_id
@@ -110,15 +110,15 @@ async def test_a2a_help_response(client: AsyncClient):
             },
         },
     )
-    
+
     assert response.status_code == 200
     result = response.json()["result"]
-    
+
     # Check that response mentions capabilities
     message = result["message"]
     assert message["role"] == "agent"
-    
+
     text_parts = [p["text"] for p in message["parts"] if p.get("kind") == "text"]
     full_text = " ".join(text_parts).lower()
-    
+
     assert "simulation" in full_text or "governance" in full_text

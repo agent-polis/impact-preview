@@ -9,7 +9,6 @@ from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_polis.a2a.models import (
     A2AErrorCode,
@@ -21,7 +20,6 @@ from agent_polis.a2a.models import (
     TaskStatus,
 )
 from agent_polis.a2a.task_store import TaskStore, get_task_store
-from agent_polis.shared.db import get_db
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -47,7 +45,7 @@ async def send_task(
 ) -> TaskResponse:
     """
     Send a message/task to this agent.
-    
+
     This is the main A2A endpoint for agent-to-agent communication.
     Other agents send tasks here, and we process them and return results.
     """
@@ -55,14 +53,14 @@ async def send_task(
         params = request.params
         message_data = params.get("message", {})
         task_id = params.get("task_id")
-        
+
         # Parse message
         message = Message(
             role=message_data.get("role", "user"),
             parts=[MessagePart(**p) for p in message_data.get("parts", [])],
             message_id=message_data.get("messageId", uuid4().hex),
         )
-        
+
         if task_id:
             # Continue existing task
             task = await task_store.get(task_id)
@@ -77,28 +75,28 @@ async def send_task(
             # Create new task
             task = Task(messages=[message])
             await task_store.save(task)
-        
+
         # Process the task (for now, just acknowledge receipt)
         # In the full implementation, this would route to simulation/governance handlers
         task.status = TaskStatus.WORKING
         await task_store.save(task)
-        
+
         # Generate response
         response_message = await process_task_message(task, message)
         task.messages.append(response_message)
-        
+
         # Mark as completed for simple requests
         task.status = TaskStatus.COMPLETED
         task.result = {"acknowledged": True}
         await task_store.save(task)
-        
+
         logger.info(
             "Task processed",
             task_id=task.id,
             status=task.status,
             message_count=len(task.messages),
         )
-        
+
         return json_rpc_success(
             request.id,
             {
@@ -109,7 +107,7 @@ async def send_task(
                 "message": response_message.model_dump(),
             },
         )
-        
+
     except Exception as e:
         logger.error("Task processing failed", error=str(e), exc_info=e)
         return json_rpc_error(
@@ -131,7 +129,7 @@ async def get_task(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task {task_id} not found",
         )
-    
+
     return {
         "id": task.id,
         "status": task.status,
@@ -155,25 +153,25 @@ async def cancel_task(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task {task_id} not found",
         )
-    
+
     if task.status in [TaskStatus.COMPLETED, TaskStatus.CANCELED, TaskStatus.FAILED]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Task already {task.status}",
         )
-    
+
     task.status = TaskStatus.CANCELED
     await task_store.save(task)
-    
+
     logger.info("Task canceled", task_id=task_id)
-    
+
     return {"id": task.id, "status": task.status}
 
 
 async def process_task_message(task: Task, message: Message) -> Message:
     """
     Process an incoming message and generate a response.
-    
+
     This is where we route messages to appropriate handlers:
     - Simulation requests go to the simulation module
     - Governance requests go to the governance module
@@ -182,7 +180,7 @@ async def process_task_message(task: Task, message: Message) -> Message:
     # Extract text from message parts
     text_parts = [p.text for p in message.parts if p.kind == "text" and p.text]
     text = " ".join(text_parts).lower() if text_parts else ""
-    
+
     # Simple routing logic (will be expanded)
     if "simulate" in text or "simulation" in text:
         response_text = (
@@ -210,7 +208,7 @@ async def process_task_message(task: Task, message: Message) -> Message:
             "I can help with simulations and (soon) governance. "
             "Send 'help' for more information."
         )
-    
+
     return Message(
         role="agent",
         parts=[MessagePart(kind="text", text=response_text)],

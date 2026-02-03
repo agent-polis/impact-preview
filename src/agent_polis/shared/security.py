@@ -2,9 +2,11 @@
 Security utilities for authentication and authorization.
 """
 
+from __future__ import annotations
+
 import hashlib
 import secrets
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
@@ -12,6 +14,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_polis.shared.db import get_db
+
+if TYPE_CHECKING:
+    from agent_polis.agents.db_models import Agent
 
 # API Key header scheme
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -32,7 +37,7 @@ async def get_api_key(
 ) -> str:
     """
     Extract and validate API key from request header.
-    
+
     Raises:
         HTTPException: If API key is missing
     """
@@ -48,35 +53,35 @@ async def get_api_key(
 async def verify_api_key(
     api_key: Annotated[str, Depends(get_api_key)],
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> "Agent":
+) -> Agent:
     """
     Verify API key and return the associated agent.
-    
+
     Raises:
         HTTPException: If API key is invalid or agent is not active
     """
     from agent_polis.agents.db_models import Agent
-    
+
     key_hash = hash_api_key(api_key)
-    
+
     result = await db.execute(
         select(Agent).where(Agent.api_key_hash == key_hash)
     )
     agent = result.scalar_one_or_none()
-    
+
     if agent is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
             headers={"WWW-Authenticate": "ApiKey"},
         )
-    
+
     if agent.status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Agent is {agent.status}",
         )
-    
+
     return agent
 
 
