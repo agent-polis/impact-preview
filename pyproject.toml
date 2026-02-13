@@ -65,6 +65,7 @@ Repository = "https://github.com/agent-polis/impact-preview"
 [project.scripts]
 impact-preview = "agent_polis.main:cli"
 impact-preview-mcp = "agent_polis.mcp_server:main"
+impact-preview-ci = "agent_polis.ci:main"
 
 [build-system]
 requires = ["hatchling"]
