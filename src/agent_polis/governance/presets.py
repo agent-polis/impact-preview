@@ -52,6 +52,7 @@ _PRESET_POLICIES: dict[str, dict[str, Any]] = {
         "rules": [
             {
                 "id": "deny-secrets-and-keys",
+                "description": "Block actions that appear to touch secrets/keys by target heuristics.",
                 "decision": "deny",
                 "priority": 0,
                 "target_contains": [
@@ -63,20 +64,40 @@ _PRESET_POLICIES: dict[str, dict[str, Any]] = {
                     "password",
                     ".pem",
                 ],
+                "metadata": {
+                    "rationale": (
+                        "Secrets/key material should never be modified or exfiltrated via agent actions "
+                        "without explicit, out-of-band review."
+                    ),
+                },
             },
             {
                 "id": "allow-docs-and-tests-low-medium",
+                "description": "Allow low/medium risk edits to docs/tests to keep iteration speed high.",
                 "decision": "allow",
                 "priority": 50,
                 "action_types": ["file_write", "file_create"],
                 "path_globs": ["docs/*", "tests/*"],
                 "max_risk_level": "medium",
+                "metadata": {
+                    "rationale": (
+                        "Documentation and tests are typically low blast-radius and can be safely "
+                        "iterated on with lighter approval."
+                    ),
+                },
             },
             {
                 "id": "require-approval-shell",
+                "description": "Require explicit approval for shell commands.",
                 "decision": "require_approval",
                 "priority": 75,
                 "action_types": ["shell_command"],
+                "metadata": {
+                    "rationale": (
+                        "Shell commands can have system-wide side effects and are hard to preview "
+                        "safely."
+                    ),
+                },
             },
         ],
     },
@@ -86,6 +107,7 @@ _PRESET_POLICIES: dict[str, dict[str, Any]] = {
         "rules": [
             {
                 "id": "deny-secrets-and-keys",
+                "description": "Block actions that appear to touch secrets/keys by target heuristics.",
                 "decision": "deny",
                 "priority": 0,
                 "target_contains": [
@@ -99,26 +121,51 @@ _PRESET_POLICIES: dict[str, dict[str, Any]] = {
                     "api_key",
                     "secret_key",
                 ],
+                "metadata": {
+                    "rationale": (
+                        "Fintech environments typically treat secrets handling as a regulated control "
+                        "surface."
+                    ),
+                },
             },
             {
                 "id": "deny-critical-risk",
+                "description": "Deny any action assessed as CRITICAL risk.",
                 "decision": "deny",
                 "priority": 5,
                 "min_risk_level": "critical",
+                "metadata": {
+                    "rationale": (
+                        "Critical-risk changes are not allowed through automated workflows in this "
+                        "preset."
+                    ),
+                },
             },
             {
                 "id": "require-approval-db-execute",
+                "description": "Require explicit approval for database write operations.",
                 "decision": "require_approval",
                 "priority": 10,
                 "action_types": ["db_execute"],
+                "metadata": {
+                    "rationale": (
+                        "Database writes can cause irreversible data loss or compliance issues."
+                    ),
+                },
             },
             {
                 "id": "allow-docs-low",
+                "description": "Allow low-risk documentation edits.",
                 "decision": "allow",
                 "priority": 50,
                 "action_types": ["file_write", "file_create"],
                 "path_globs": ["docs/*"],
                 "max_risk_level": "low",
+                "metadata": {
+                    "rationale": (
+                        "Documentation updates are safe, but this preset keeps a tighter threshold."
+                    ),
+                },
             },
         ],
     },
@@ -128,6 +175,7 @@ _PRESET_POLICIES: dict[str, dict[str, Any]] = {
         "rules": [
             {
                 "id": "deny-secrets-and-keys",
+                "description": "Block actions that appear to touch secrets/keys by target heuristics.",
                 "decision": "deny",
                 "priority": 0,
                 "target_contains": [
@@ -139,22 +187,40 @@ _PRESET_POLICIES: dict[str, dict[str, Any]] = {
                     "password",
                     ".pem",
                 ],
+                "metadata": {
+                    "rationale": (
+                        "Even in creative workflows, credentials and key material remain sensitive."
+                    ),
+                },
             },
             {
                 "id": "allow-assets-and-docs-low-medium",
+                "description": "Allow low/medium risk edits to assets and docs to support iteration.",
                 "decision": "allow",
                 "priority": 50,
                 "action_types": ["file_write", "file_create"],
                 "path_globs": ["assets/*", "docs/*"],
                 "max_risk_level": "medium",
+                "metadata": {
+                    "rationale": (
+                        "Assets/docs changes are common and usually reversible; allow with medium "
+                        "risk cap."
+                    ),
+                },
             },
             {
                 "id": "allow-tests-low-medium",
+                "description": "Allow low/medium risk edits to tests.",
                 "decision": "allow",
                 "priority": 55,
                 "action_types": ["file_write", "file_create"],
                 "path_globs": ["tests/*"],
                 "max_risk_level": "medium",
+                "metadata": {
+                    "rationale": (
+                        "Tests are low blast-radius and should not slow down iteration."
+                    ),
+                },
             },
         ],
     },
@@ -180,4 +246,3 @@ def load_policy_preset(preset_id: str) -> PolicyConfig:
         available = ", ".join(sorted(_PRESET_POLICIES.keys()))
         raise ValueError(f"Unknown preset id '{preset_id}'. Available: {available}")
     return load_policy_from_dict(_PRESET_POLICIES[preset_id])
-
