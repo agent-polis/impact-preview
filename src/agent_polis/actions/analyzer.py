@@ -17,8 +17,11 @@ from agent_polis.actions.models import (
     FileChange,
     RiskLevel,
 )
+from agent_polis.governance.prompt_scanner import PromptInjectionScanner, severity_to_risk_level
 
 logger = structlog.get_logger()
+
+_prompt_scanner = PromptInjectionScanner()
 
 
 class ImpactAnalyzer:
@@ -91,25 +94,45 @@ class ImpactAnalyzer:
             target=request.target,
         )
 
+        # Content-level safety checks (prompt injection/risky instructions) apply to all action types.
+        scan_result = _prompt_scanner.scan_action_request(request)
+
         if request.action_type in [
             ActionType.FILE_WRITE,
             ActionType.FILE_CREATE,
             ActionType.FILE_DELETE,
             ActionType.FILE_MOVE,
         ]:
-            return await self._analyze_file_operation(request)
+            preview = await self._analyze_file_operation(request)
 
         elif request.action_type == ActionType.SHELL_COMMAND:
-            return await self._analyze_shell_command(request)
+            preview = await self._analyze_shell_command(request)
 
         elif request.action_type in [ActionType.DB_QUERY, ActionType.DB_EXECUTE]:
-            return await self._analyze_db_operation(request)
+            preview = await self._analyze_db_operation(request)
 
         elif request.action_type == ActionType.API_CALL:
-            return await self._analyze_api_call(request)
+            preview = await self._analyze_api_call(request)
 
         else:
-            return await self._analyze_custom(request)
+            preview = await self._analyze_custom(request)
+
+        if scan_result.findings:
+            preview.risk_factors.extend(scan_result.to_risk_factors())
+            scan_risk = severity_to_risk_level(scan_result.max_severity())
+            if scan_risk != RiskLevel.LOW:
+                # Escalate to at least the scanner risk.
+                preview.risk_level = max(
+                    (preview.risk_level, scan_risk),
+                    key=lambda level: {
+                        RiskLevel.LOW: 0,
+                        RiskLevel.MEDIUM: 1,
+                        RiskLevel.HIGH: 2,
+                        RiskLevel.CRITICAL: 3,
+                    }[level],
+                )
+
+        return preview
 
     async def _analyze_file_operation(self, request: ActionRequest) -> ActionPreview:
         """Analyze file operations (create, write, delete, move)."""

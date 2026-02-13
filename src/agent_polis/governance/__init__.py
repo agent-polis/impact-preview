@@ -21,6 +21,13 @@ from agent_polis.governance.policy import (
     load_policy_from_dict,
     load_policy_from_file,
 )
+from agent_polis.governance.prompt_scanner import (
+    PromptInjectionScanner,
+    ScanFinding,
+    ScanResult,
+    ScanSeverity,
+    severity_to_risk_level,
+)
 
 __all__ = [
     "DescriptorIntegrityChecker",
@@ -38,6 +45,11 @@ __all__ = [
     "PolicyEvaluationResult",
     "PolicyEvaluator",
     "PolicyRule",
+    "PromptInjectionScanner",
+    "ScanFinding",
+    "ScanResult",
+    "ScanSeverity",
     "load_policy_from_dict",
     "load_policy_from_file",
+    "severity_to_risk_level",
 ]
