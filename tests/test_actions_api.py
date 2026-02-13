@@ -371,6 +371,14 @@ class TestActionsAPI:
         # Should have at least ActionProposed and ActionPreviewGenerated events
         event_types = [e["type"] for e in events]
         assert "ActionProposed" in event_types
+        assert "ActionPreviewGenerated" in event_types
+
+        preview_event = next(e for e in events if e["type"] == "ActionPreviewGenerated")
+        assert "governance" in preview_event["data"]
+        assert "policy" in preview_event["data"]["governance"]
+        assert "scanner" in preview_event["data"]["governance"]
+        assert preview_event["data"]["governance"]["policy"]["decision"] == "require_approval"
+        assert preview_event["data"]["governance"]["scanner"]["max_severity"] == "low"
 
     async def test_auto_approve_low_risk(
         self,

@@ -123,6 +123,18 @@ curl http://localhost:8000/api/v1/actions/ACTION_ID/preview -H "X-API-Key: YOUR_
 curl -X POST http://localhost:8000/api/v1/actions/ACTION_ID/approve -H "X-API-Key: YOUR_API_KEY"
 ```
 
+### Audit Trail (Events)
+
+You can retrieve the complete audit trail for an action:
+
+```bash
+curl http://localhost:8000/api/v1/actions/ACTION_ID/events -H "X-API-Key: YOUR_API_KEY"
+```
+
+`ActionPreviewGenerated` event payload includes machine-readable governance context:
+- `data.governance.policy.decision` / `data.governance.policy.matched_rule_id`
+- `data.governance.scanner.reason_ids` / `data.governance.scanner.max_severity`
+
 ---
 
 ## 🐍 SDK Integration

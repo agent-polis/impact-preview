@@ -33,8 +33,38 @@ from agent_polis.events.types import (
     ActionRejected,
     ActionTimedOut,
 )
+from agent_polis.governance.policy import (
+    PolicyConfig,
+    PolicyDecision,
+    PolicyEvaluator,
+    PolicyRule,
+)
+from agent_polis.governance.prompt_scanner import PromptInjectionScanner
 
 logger = structlog.get_logger()
+
+_policy_evaluator = PolicyEvaluator()
+_audit_scanner = PromptInjectionScanner()
+
+
+def _builtin_policy_for_request(request: ActionRequest) -> PolicyConfig:
+    """
+    Built-in policy that mirrors existing behavior.
+
+    - Default: require approval
+    - If auto_approve_if_low_risk=True: allow when risk is LOW
+    """
+    rules: list[PolicyRule] = []
+    if request.auto_approve_if_low_risk:
+        rules.append(
+            PolicyRule(
+                id="builtin:auto_approve_if_low_risk",
+                decision=PolicyDecision.ALLOW,
+                priority=0,
+                max_risk_level=RiskLevel.LOW,
+            )
+        )
+    return PolicyConfig(version="builtin-1", rules=rules)
 
 
 class ActionService:
@@ -360,6 +390,27 @@ class ActionService:
         await publish_event(event)
 
     async def _emit_preview_event(self, action: Action, preview: ActionPreview) -> None:
+        audit_request = ActionRequest(
+            action_type=ActionType(action.action_type),
+            description=action.description,
+            target=action.target,
+            payload=action.payload,
+            context=action.context,
+            timeout_seconds=action.timeout_seconds,
+            auto_approve_if_low_risk=action.auto_approve_if_low_risk,
+            callback_url=action.callback_url,
+        )
+
+        # Record scanner findings and policy evaluation in the audit trail. This is
+        # intentionally machine-readable (reason IDs), and avoids storing raw text snippets.
+        scan_result = _audit_scanner.scan_action_request(audit_request)
+        policy = _builtin_policy_for_request(audit_request)
+        policy_result = _policy_evaluator.evaluate(
+            policy,
+            audit_request,
+            risk_level=preview.risk_level,
+        )
+
         event = ActionPreviewGenerated(
             stream_id=f"action:{action.id}",
             data={
@@ -367,6 +418,29 @@ class ActionService:
                 "risk_level": preview.risk_level.value,
                 "affected_count": preview.affected_count,
                 "warnings_count": len(preview.warnings),
+                "risk_factors_count": len(preview.risk_factors),
+                "governance": {
+                    "policy": {
+                        "version": policy.version,
+                        "decision": policy_result.decision.value,
+                        "matched_rule_id": policy_result.matched_rule_id,
+                        "matched_rule_priority": policy_result.matched_rule_priority,
+                        "matched_rule_specificity": policy_result.matched_rule_specificity,
+                        "trace": policy_result.trace,
+                    },
+                    "scanner": {
+                        "max_severity": scan_result.max_severity().value,
+                        "reason_ids": sorted({f.reason_id for f in scan_result.findings}),
+                        "findings": [
+                            {
+                                "reason_id": f.reason_id,
+                                "severity": f.severity.value,
+                                "field": f.field,
+                            }
+                            for f in scan_result.findings
+                        ],
+                    },
+                },
             },
         )
         await self.event_store.append(event)
