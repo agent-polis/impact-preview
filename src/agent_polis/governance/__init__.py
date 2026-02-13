@@ -1,15 +1,25 @@
-"""
-Governance module - proposals, voting, and sanctions.
+"""Governance and policy primitives for action controls."""
 
-This module is Phase 2 of the roadmap. It will include:
-- Proposals with structured debate (pro/con threads)
-- Multiple voting mechanisms (majority, quadratic, supermajority)
-- Graduated sanctions system
-- Conflict resolution
-- Reputation based on prediction accuracy
+from agent_polis.governance.policy import (
+    PolicyConfig,
+    PolicyDecision,
+    PolicyDefaults,
+    PolicyEvaluationInput,
+    PolicyEvaluationResult,
+    PolicyEvaluator,
+    PolicyRule,
+    load_policy_from_dict,
+    load_policy_from_file,
+)
 
-For now, this is a placeholder to ensure the package structure is correct.
-"""
-
-# Phase 2: Coming soon
-__all__ = []
+__all__ = [
+    "PolicyConfig",
+    "PolicyDecision",
+    "PolicyDefaults",
+    "PolicyEvaluationInput",
+    "PolicyEvaluationResult",
+    "PolicyEvaluator",
+    "PolicyRule",
+    "load_policy_from_dict",
+    "load_policy_from_file",
+]
