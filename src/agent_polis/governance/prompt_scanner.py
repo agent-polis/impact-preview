@@ -1,4 +1,9 @@
-"""Prompt-injection and risky-instruction scanner."""
+"""Prompt-injection and risky-instruction scanner.
+
+This module is intentionally conservative and bounded:
+- Avoids recursive payload walking (prevents recursion-depth crashes).
+- Caps the amount of text scanned to reduce CPU abuse risk.
+"""
 
 from __future__ import annotations
 
@@ -86,6 +91,11 @@ class _ScannerRule:
 class PromptInjectionScanner:
     """Rule-based scanner for prompt injection and risky instructions."""
 
+    # Bounds to keep scanning predictable for untrusted inputs.
+    DEFAULT_MAX_TEXT_CHARS = 20_000
+    DEFAULT_MAX_PAYLOAD_STRINGS = 500
+    DEFAULT_MAX_PAYLOAD_DEPTH = 32
+
     DEFAULT_RULES: tuple[_ScannerRule, ...] = (
         _ScannerRule(
             reason_id="prompt_injection.ignore_instructions",
@@ -147,8 +157,18 @@ class PromptInjectionScanner:
         ),
     )
 
-    def __init__(self, rules: Iterable[_ScannerRule] | None = None) -> None:
+    def __init__(
+        self,
+        rules: Iterable[_ScannerRule] | None = None,
+        *,
+        max_text_chars: int = DEFAULT_MAX_TEXT_CHARS,
+        max_payload_strings: int = DEFAULT_MAX_PAYLOAD_STRINGS,
+        max_payload_depth: int = DEFAULT_MAX_PAYLOAD_DEPTH,
+    ) -> None:
         self.rules = tuple(rules) if rules is not None else self.DEFAULT_RULES
+        self.max_text_chars = max(1, max_text_chars)
+        self.max_payload_strings = max(0, max_payload_strings)
+        self.max_payload_depth = max(0, max_payload_depth)
 
     def scan_action_request(self, request: ActionRequest) -> ScanResult:
         """Scan action request inputs and payload metadata."""
@@ -167,9 +187,11 @@ class PromptInjectionScanner:
         if not text.strip():
             return []
 
+        text_to_scan = text[: self.max_text_chars]
+
         findings: list[ScanFinding] = []
         for rule in self.rules:
-            match = rule.pattern.search(text)
+            match = rule.pattern.search(text_to_scan)
             if not match:
                 continue
             snippet = match.group(0).strip()[:160]
@@ -185,7 +207,10 @@ class PromptInjectionScanner:
         return findings
 
     def scan_payload(self, payload: dict[str, Any]) -> list[ScanFinding]:
-        """Scan payload recursively for risky strings in metadata/instructions."""
+        """Scan payload for risky strings in metadata/instructions.
+
+        Uses an explicit stack instead of recursion to avoid recursion-depth crashes.
+        """
         findings: list[ScanFinding] = []
         for field, value in self._iter_string_fields(payload, prefix="payload"):
             findings.extend(self.scan_text(value, field=field))
@@ -196,21 +221,32 @@ class PromptInjectionScanner:
         value: Any,
         prefix: str,
     ) -> Iterable[tuple[str, str]]:
-        if isinstance(value, str):
-            yield prefix, value
-            return
+        stack: list[tuple[Any, str, int]] = [(value, prefix, 0)]
+        yielded_strings = 0
 
-        if isinstance(value, dict):
-            for key, nested in value.items():
-                key_name = str(key)
-                nested_prefix = f"{prefix}.{key_name}"
-                yield from self._iter_string_fields(nested, nested_prefix)
-            return
+        while stack:
+            current, current_prefix, depth = stack.pop()
 
-        if isinstance(value, list | tuple | set):
-            for idx, nested in enumerate(value):
-                nested_prefix = f"{prefix}[{idx}]"
-                yield from self._iter_string_fields(nested, nested_prefix)
+            if self.max_payload_depth and depth > self.max_payload_depth:
+                continue
+
+            if isinstance(current, str):
+                yield current_prefix, current
+                yielded_strings += 1
+                if self.max_payload_strings and yielded_strings >= self.max_payload_strings:
+                    return
+                continue
+
+            if isinstance(current, dict):
+                # Push in reverse to preserve a stable-ish traversal order.
+                for key, nested in reversed(list(current.items())):
+                    key_name = str(key)
+                    stack.append((nested, f"{current_prefix}.{key_name}", depth + 1))
+                continue
+
+            if isinstance(current, list | tuple | set):
+                for idx, nested in reversed(list(enumerate(current))):
+                    stack.append((nested, f"{current_prefix}[{idx}]", depth + 1))
 
     def _dedupe_findings(self, findings: list[ScanFinding]) -> list[ScanFinding]:
         deduped: list[ScanFinding] = []
